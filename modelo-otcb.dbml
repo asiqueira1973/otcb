@@ -1,0 +1,263 @@
+// OTCB — modelo de dados (spec.md, seção 7)
+// Banco: Supabase BANCO DE TESTE, prefixo otcb_
+// auth.users é a tabela de usuários do Supabase Auth (fora do schema public)
+
+Table auth.users {
+  id uuid [pk]
+  Note: 'Tabela do Supabase Auth (referência)'
+}
+
+enum otcb_papel {
+  usuario
+  admin
+}
+
+enum otcb_status_bar {
+  confirmado
+  provavel
+  incerto
+  sem_brahma
+  fechado
+}
+
+enum otcb_assunto_evidencia {
+  tem_brahma
+  transmite_jogos
+  funcionamento
+}
+
+enum otcb_sinal_evidencia {
+  positivo
+  negativo
+  fechado
+}
+
+enum otcb_tipo_evidencia {
+  foto_colarinhometro
+  confirmacao_usuario
+  sugestao_usuario
+  cardapio_site
+  pagina_web
+  avaliacao_google
+  status_google
+  seed_otcb_antigo
+}
+
+enum otcb_origem_evidencia {
+  usuario
+  garimpo
+  seed
+}
+
+enum otcb_status_opiniao {
+  publicada
+  oculta_moderacao
+  oculta_denuncias
+  oculta_admin
+}
+
+enum otcb_papel_mensagem {
+  usuario
+  assistente
+  sistema
+}
+
+enum otcb_tipo_execucao {
+  descoberta
+  revisita
+  coordenadas
+  resumos
+  jogos
+}
+
+enum otcb_status_execucao {
+  em_andamento
+  concluida
+  falhou
+}
+
+// apelido: 3 a 20 caracteres, ^[A-Za-z0-9_.]+$, único em lower(apelido)
+// trigger otcb_trg_perfil_protege_papel impede não admin de alterar papel
+Table otcb_perfis {
+  id uuid [pk, note: 'FK auth.users.id, on delete cascade']
+  apelido text [not null]
+  papel otcb_papel [not null, default: 'usuario']
+  maioridade_confirmada_em timestamptz [not null]
+  time_do_coracao text [note: 'nulo quando o usuário não informou']
+  criado_em timestamptz [not null, default: `now()`]
+  atualizado_em timestamptz [not null, default: `now()`]
+
+  Note: 'Dados do usuário no app'
+}
+
+// soft delete por excluido_em
+// índices: (status), (bairro), (latitude, longitude)
+Table otcb_bares {
+  id uuid [pk, default: `gen_random_uuid()`]
+  nome text [not null]
+  endereco text [not null]
+  bairro text [not null]
+  latitude numeric(9,6) [not null]
+  longitude numeric(9,6) [not null]
+  coordenadas_atualizadas_em timestamptz [not null, default: `now()`]
+  google_place_id text [unique, note: 'nulo quando ainda não casado com o Google']
+  status otcb_status_bar [not null, default: 'incerto']
+  pontuacao_brahma numeric(6,3) [not null, default: 0]
+  status_atualizado_em timestamptz [not null, default: `now()`]
+  transmite_jogos boolean [note: 'nulo = sem informação']
+  tem_balcao boolean [note: 'nulo = sem informação']
+  classico boolean [not null, default: false]
+  nota_colarinho_media numeric(4,2) [note: 'nula sem foto avaliada']
+  qtd_fotos_avaliadas integer [not null, default: 0]
+  nota_opinioes_media numeric(3,2) [note: 'nula sem opinião publicada com nota']
+  qtd_opinioes integer [not null, default: 0]
+  resumo_opinioes text [note: 'nulo com menos de 3 opiniões publicadas']
+  resumo_atualizado_em timestamptz [note: 'nulo enquanto resumo_opinioes for nulo']
+  excluido_em timestamptz [note: 'soft delete; nulo = ativo']
+  criado_em timestamptz [not null, default: `now()`]
+  atualizado_em timestamptz [not null, default: `now()`]
+
+  Note: 'Cada bar conhecido'
+}
+
+// check: sinal = fechado só com assunto = funcionamento
+// check: char_length(trecho) <= 300
+// índice único parcial: (bar_id, assunto, url_fonte) where url_fonte is not null
+// índice: (bar_id, assunto)
+Table otcb_evidencias {
+  id uuid [pk, default: `gen_random_uuid()`]
+  bar_id uuid [not null]
+  assunto otcb_assunto_evidencia [not null]
+  sinal otcb_sinal_evidencia [not null]
+  tipo otcb_tipo_evidencia [not null]
+  origem otcb_origem_evidencia [not null]
+  usuario_id uuid [note: 'on delete set null; nulo para garimpo, seed e contas apagadas']
+  foto_id uuid [note: 'on delete set null; nulo quando não veio de foto']
+  url_fonte text [note: 'nula para usuário e seed']
+  trecho text [note: 'até 300 caracteres; nulo para usuário e seed']
+  data_evidencia timestamptz [not null]
+  peso numeric(4,2) [not null]
+  meia_vida_dias integer [not null]
+  criado_em timestamptz [not null, default: `now()`]
+
+  Note: 'Indícios de Brahma, jogos ou funcionamento'
+}
+
+// soft delete pelo dono (excluido_em); hard delete na exclusão de conta
+Table otcb_fotos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [not null, note: 'on delete cascade']
+  bar_id uuid [note: 'nulo quando não havia bar a até 150 m']
+  distancia_bar_metros integer [note: 'nula quando bar_id é nulo']
+  caminho_storage text [not null]
+  e_chopp boolean [not null]
+  usuario_confirmou_brahma boolean [not null]
+  nota_altura numeric(3,1) [note: 'nula quando e_chopp = false']
+  nota_cremosidade numeric(3,1) [note: 'nula quando e_chopp = false']
+  nota_copo numeric(3,1) [note: 'nula quando e_chopp = false']
+  nota_gelado numeric(3,1) [note: 'nula quando e_chopp = false']
+  nota_colarinho numeric(3,1) [note: 'nula quando e_chopp = false']
+  comentario_ia text [note: 'nula se a IA falhar']
+  modelo_ia text [not null]
+  excluido_em timestamptz [note: 'soft delete pelo dono']
+  criado_em timestamptz [not null, default: `now()`]
+
+  Note: 'Fotos enviadas ao Colarinhômetro'
+}
+
+Table otcb_carimbos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [not null, note: 'on delete cascade']
+  bar_id uuid [not null]
+  foto_id uuid [note: 'on delete set null; nula se a foto foi apagada']
+  criado_em timestamptz [not null, default: `now()`]
+
+  indexes {
+    (usuario_id, bar_id) [unique]
+  }
+
+  Note: 'Passaporte do Chopp'
+}
+
+// check: char_length(texto) between 10 and 500
+// check: nota between 1 and 5
+Table otcb_opinioes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [not null, note: 'on delete cascade']
+  bar_id uuid [not null]
+  texto text [not null]
+  nota smallint [note: 'nula quando o usuário não deu nota']
+  status otcb_status_opiniao [not null, default: 'publicada']
+  motivo_ocultacao text [note: 'nulo enquanto publicada']
+  qtd_denuncias integer [not null, default: 0]
+  criado_em timestamptz [not null, default: `now()`]
+  atualizado_em timestamptz [not null, default: `now()`]
+
+  indexes {
+    (usuario_id, bar_id) [unique]
+  }
+}
+
+Table otcb_denuncias {
+  id uuid [pk, default: `gen_random_uuid()`]
+  opiniao_id uuid [not null, note: 'on delete cascade']
+  usuario_id uuid [not null, note: 'on delete cascade']
+  motivo text [note: 'nulo quando não escreveu motivo']
+  criado_em timestamptz [not null, default: `now()`]
+
+  indexes {
+    (opiniao_id, usuario_id) [unique]
+  }
+}
+
+// índice: (usuario_id, criado_em desc); retenção de 30 dias
+Table otcb_mensagens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  usuario_id uuid [not null, note: 'on delete cascade']
+  papel otcb_papel_mensagem [not null]
+  conteudo text [not null]
+  blocos jsonb [note: 'nulo em mensagens só de texto']
+  criado_em timestamptz [not null, default: `now()`]
+
+  Note: 'Histórico do chat'
+}
+
+// hard delete 2 dias após o início
+Table otcb_jogos {
+  id uuid [pk, default: `gen_random_uuid()`]
+  id_externo text [not null, unique]
+  competicao text [not null]
+  mandante text [not null]
+  visitante text [not null]
+  inicio timestamptz [not null]
+  atualizado_em timestamptz [not null, default: `now()`]
+}
+
+Table otcb_execucoes_garimpo {
+  id uuid [pk, default: `gen_random_uuid()`]
+  tipo otcb_tipo_execucao [not null]
+  status otcb_status_execucao [not null, default: 'em_andamento']
+  cursor text [note: 'nulo quando concluída']
+  iniciado_em timestamptz [not null, default: `now()`]
+  concluido_em timestamptz [note: 'nulo enquanto em andamento']
+  bares_novos integer [not null, default: 0]
+  evidencias_criadas integer [not null, default: 0]
+  chamadas_google integer [not null, default: 0]
+  chamadas_firecrawl integer [not null, default: 0]
+  erros jsonb [note: 'nulo quando não houve erro']
+}
+
+Ref: otcb_perfis.id - auth.users.id
+Ref: otcb_evidencias.bar_id > otcb_bares.id
+Ref: otcb_evidencias.usuario_id > otcb_perfis.id
+Ref: otcb_evidencias.foto_id > otcb_fotos.id
+Ref: otcb_fotos.usuario_id > otcb_perfis.id
+Ref: otcb_fotos.bar_id > otcb_bares.id
+Ref: otcb_carimbos.usuario_id > otcb_perfis.id
+Ref: otcb_carimbos.bar_id > otcb_bares.id
+Ref: otcb_carimbos.foto_id > otcb_fotos.id
+Ref: otcb_opinioes.usuario_id > otcb_perfis.id
+Ref: otcb_opinioes.bar_id > otcb_bares.id
+Ref: otcb_denuncias.opiniao_id > otcb_opinioes.id
+Ref: otcb_denuncias.usuario_id > otcb_perfis.id
+Ref: otcb_mensagens.usuario_id > otcb_perfis.id
