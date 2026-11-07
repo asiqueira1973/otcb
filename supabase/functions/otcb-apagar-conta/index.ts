@@ -15,20 +15,23 @@ Deno.serve((req) =>
       const { data, error } = await admin.auth.getUser(token);
       return error || !data.user ? null : data.user.id;
     },
-    // Lista e remove os arquivos da pasta do usuário no bucket (o caminho é sempre {userId}/..., 7.2).
+    // Lista e remove os arquivos da pasta do usuário no bucket (o caminho é sempre {userId}/{foto}.jpg, 7.2).
+    // Só arquivos (id preenchido); para quando não há mais arquivos, mesmo que exista alguma subpasta.
     async deleteStorageFolder(userId) {
       const bucket = admin.storage.from("otcb-fotos");
       for (;;) {
         const { data, error } = await bucket.list(userId, { limit: 100 });
         if (error) throw error;
-        if (!data || data.length === 0) return;
-        const { error: removeError } = await bucket.remove(data.map((file) => `${userId}/${file.name}`));
+        const files = (data ?? []).filter((entry) => entry.id !== null);
+        if (files.length === 0) return;
+        const { error: removeError } = await bucket.remove(files.map((file) => `${userId}/${file.name}`));
         if (removeError) throw removeError;
       }
     },
-    // Desvincula as evidências do usuário (seção 7.4).
+    // Desvincula as evidências do usuário preservando o "um voto por pessoa" (7.4 × 11.1):
+    // otcb_anonimizar_evidencias apaga as superadas e anula usuario_id das restantes.
     async anonymizeEvidence(userId) {
-      const { error } = await admin.from("otcb_evidencias").update({ usuario_id: null }).eq("usuario_id", userId);
+      const { error } = await admin.rpc("otcb_anonimizar_evidencias", { p_usuario: userId });
       if (error) throw error;
     },
     // Apaga o perfil (seção 7.4: hard delete; as tabelas filhas caem em cascata).
