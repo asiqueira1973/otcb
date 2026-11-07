@@ -13,3 +13,14 @@ supabase/.temp/
 supabase/.branches/
 ios/
 android/
+
+# Expo / Metro
+expo-env.d.ts
+.metro-health-check*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+npm-debug.*
