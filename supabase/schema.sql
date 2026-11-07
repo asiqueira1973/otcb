@@ -148,13 +148,40 @@ $$;
 ALTER FUNCTION "public"."otcb_agregados_confirmacao"("p_bar_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_agregar_fotos_do_bar"("p_bar_id" "uuid") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update public.otcb_bares b
+     set nota_colarinho_media = a.media, qtd_fotos_avaliadas = a.qtd
+    from (select round(avg(f.nota_colarinho), 2) as media, count(f.nota_colarinho)::integer as qtd
+            from public.otcb_fotos f
+           where f.bar_id = p_bar_id and f.excluido_em is null) a
+   where b.id = p_bar_id;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_agregar_fotos_do_bar"("p_bar_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_agregar_opinioes"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-declare
-  v_bar uuid := coalesce(new.bar_id, old.bar_id);
 begin
+  perform public.otcb_agregar_opinioes_do_bar(coalesce(new.bar_id, old.bar_id));
+  return null;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_agregar_opinioes"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_agregar_opinioes_do_bar"("p_bar_id" "uuid") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
   update public.otcb_bares b
      set nota_opinioes_media = a.media,
          qtd_opinioes = a.qtd,
@@ -162,14 +189,51 @@ begin
          resumo_atualizado_em = case when a.qtd < 3 then null else b.resumo_atualizado_em end
     from (select round(avg(o.nota) filter (where o.nota is not null), 2) as media, count(*)::integer as qtd
             from public.otcb_opinioes o
-           where o.bar_id = v_bar and o.status = 'publicada') a
-   where b.id = v_bar;
-  return null;
+           where o.bar_id = p_bar_id and o.status = 'publicada') a
+   where b.id = p_bar_id;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_agregar_opinioes_do_bar"("p_bar_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_anonimizar_ao_apagar_perfil"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  perform public.otcb_anonimizar_evidencias(old.id);
+  return old;
 end;
 $$;
 
 
-ALTER FUNCTION "public"."otcb_agregar_opinioes"() OWNER TO "postgres";
+ALTER FUNCTION "public"."otcb_anonimizar_ao_apagar_perfil"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_anonimizar_evidencias"("p_usuario" "uuid") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_total integer;
+begin
+  delete from public.otcb_evidencias e
+   using (select id,
+                 row_number() over (partition by bar_id, assunto
+                                    order by data_evidencia desc, criado_em desc, id desc) as ordem
+            from public.otcb_evidencias
+           where usuario_id = p_usuario) r
+   where e.id = r.id and r.ordem > 1;
+
+  update public.otcb_evidencias set usuario_id = null where usuario_id = p_usuario;
+  get diagnostics v_total = row_count;
+  return v_total;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_anonimizar_evidencias"("p_usuario" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double precision, "p_longitude" double precision) RETURNS TABLE("bar_id" "uuid", "distancia_metros" integer)
@@ -454,18 +518,18 @@ begin
     join public.otcb_bares b on b.id = c.bar_id
    where c.usuario_id = v_uid;
 
-  -- Coleção do bairro: bairros com bares ativos confirmado/provavel; conquista com min(3, total) carimbos.
   select coalesce(jsonb_agg(jsonb_build_object('bairro', t.bairro, 'carimbos', t.carimbos, 'total_bares', t.total,
                                                'conquistado', t.carimbos >= least(3, t.total))
                             order by t.bairro), '[]'::jsonb)
     into v_bairros
-    from (select b.bairro,
+    from (select a.bairro,
                  count(*)::integer as total,
-                 count(c.id)::integer as carimbos
-            from public.otcb_bares b
-            left join public.otcb_carimbos c on c.bar_id = b.id and c.usuario_id = v_uid
-           where b.excluido_em is null and b.status in ('confirmado', 'provavel')
-           group by b.bairro) t;
+                 (select count(*)::integer
+                    from public.otcb_carimbos c join public.otcb_bares cb on cb.id = c.bar_id
+                   where c.usuario_id = v_uid and cb.bairro = a.bairro) as carimbos
+            from public.otcb_bares a
+           where a.excluido_em is null and a.status in ('confirmado', 'provavel')
+           group by a.bairro) t;
 
   select jsonb_build_object('carimbos', count(c.id)::integer, 'total', count(*)::integer)
     into v_classicos
@@ -481,6 +545,7 @@ begin
     from public.otcb_evidencias e
     join public.otcb_bares b on b.id = e.bar_id
    where e.usuario_id = v_uid and e.tipo in ('confirmacao_usuario', 'sugestao_usuario')
+     and e.assunto = 'tem_brahma' and e.sinal = 'positivo'
      and b.status in ('confirmado', 'provavel');
 
   return jsonb_build_object(
@@ -538,13 +603,12 @@ begin
     end if;
   end if;
 
-  if new.bar_id is not null then
-    update public.otcb_bares b
-       set nota_colarinho_media = a.media, qtd_fotos_avaliadas = a.qtd
-      from (select round(avg(f.nota_colarinho), 2) as media, count(f.nota_colarinho)::integer as qtd
-              from public.otcb_fotos f
-             where f.bar_id = new.bar_id and f.excluido_em is null) a
-     where b.id = new.bar_id;
+  if tg_op = 'DELETE' then
+    if old.bar_id is not null then
+      perform public.otcb_agregar_fotos_do_bar(old.bar_id);
+    end if;
+  elsif new.bar_id is not null then
+    perform public.otcb_agregar_fotos_do_bar(new.bar_id);
   end if;
   return null;
 end;
@@ -585,8 +649,6 @@ declare
   v_status public.otcb_status_bar;
   v_transmite boolean;
 begin
-  -- Pontuações por assunto (11.1). Evidências sem usuário (garimpo, seed, contas apagadas) contam todas;
-  -- de cada usuário entra só a mais recente daquele assunto ("um voto por pessoa").
   with ev as (
     select e.assunto, e.peso, e.meia_vida_dias, e.data_evidencia,
            case when e.usuario_id is null then 1
@@ -606,12 +668,11 @@ begin
     from ev
    where ordem = 1;
 
-  -- 11.2 (1): fechamento pelo Google (a qualquer tempo) ou por 2 usuários distintos nos últimos 30 dias.
   select max(e.data_evidencia) into v_fechado_google
     from public.otcb_evidencias e
    where e.bar_id = p_bar_id and e.assunto = 'funcionamento' and e.sinal = 'fechado' and e.tipo = 'status_google';
 
-  select case when count(distinct e.usuario_id) >= 2 then max(e.data_evidencia) end
+  select case when count(distinct coalesce(e.usuario_id::text, e.id::text)) >= 2 then max(e.data_evidencia) end
     into v_fechado_usuarios
     from public.otcb_evidencias e
    where e.bar_id = p_bar_id and e.assunto = 'funcionamento' and e.sinal = 'fechado'
@@ -676,6 +737,8 @@ declare
 begin
   for v_id in select id from public.otcb_bares where excluido_em is null loop
     perform public.otcb_recalcular_bar(v_id);
+    perform public.otcb_agregar_fotos_do_bar(v_id);
+    perform public.otcb_agregar_opinioes_do_bar(v_id);
     v_total := v_total + 1;
   end loop;
   return v_total;
@@ -1159,11 +1222,15 @@ CREATE OR REPLACE TRIGGER "otcb_trg_evidencia_recalcula" AFTER INSERT OR DELETE 
 
 
 
-CREATE OR REPLACE TRIGGER "otcb_trg_foto_processa" AFTER INSERT OR UPDATE OF "excluido_em" ON "public"."otcb_fotos" FOR EACH ROW EXECUTE FUNCTION "public"."otcb_processar_foto"();
+CREATE OR REPLACE TRIGGER "otcb_trg_foto_processa" AFTER INSERT OR DELETE OR UPDATE OF "excluido_em" ON "public"."otcb_fotos" FOR EACH ROW EXECUTE FUNCTION "public"."otcb_processar_foto"();
 
 
 
 CREATE OR REPLACE TRIGGER "otcb_trg_opiniao_agrega" AFTER INSERT OR DELETE OR UPDATE ON "public"."otcb_opinioes" FOR EACH ROW EXECUTE FUNCTION "public"."otcb_agregar_opinioes"();
+
+
+
+CREATE OR REPLACE TRIGGER "otcb_trg_perfil_anonimiza" BEFORE DELETE ON "public"."otcb_perfis" FOR EACH ROW EXECUTE FUNCTION "public"."otcb_anonimizar_ao_apagar_perfil"();
 
 
 
@@ -1297,7 +1364,7 @@ CREATE POLICY "otcb_fotos_admin_le" ON "public"."otcb_fotos" FOR SELECT TO "auth
 
 
 
-CREATE POLICY "otcb_fotos_exclui_propria" ON "public"."otcb_fotos" FOR UPDATE TO "authenticated" USING (("usuario_id" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("usuario_id" = ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "otcb_fotos_exclui_propria" ON "public"."otcb_fotos" FOR UPDATE TO "authenticated" USING (("usuario_id" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ((("usuario_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("excluido_em" IS NOT NULL) AND ("excluido_em" <= ("now"() + '00:01:00'::interval))));
 
 
 
@@ -1374,8 +1441,28 @@ GRANT ALL ON FUNCTION "public"."otcb_agregados_confirmacao"("p_bar_id" "uuid") T
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_agregar_fotos_do_bar"("p_bar_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_agregar_fotos_do_bar"("p_bar_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."otcb_agregar_opinioes"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_agregar_opinioes"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_agregar_opinioes_do_bar"("p_bar_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_agregar_opinioes_do_bar"("p_bar_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_anonimizar_ao_apagar_perfil"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_anonimizar_ao_apagar_perfil"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_anonimizar_evidencias"("p_usuario" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_anonimizar_evidencias"("p_usuario" "uuid") TO "service_role";
 
 
 

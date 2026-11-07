@@ -3,8 +3,8 @@ import type { Place } from './places';
 
 // Persistência usada pela importação (implementada com o service role em scripts/import-seed.ts).
 export type SeedRepo = {
-  // Devolve true se já existe bar com esse google_place_id (importação idempotente).
-  barExists(placeId: string): Promise<boolean>;
+  // Devolve o bar já existente com esse google_place_id e se ele já tem a evidência de semente, ou null.
+  findBar(placeId: string): Promise<{ id: string; hasSeed: boolean } | null>;
   // Cria o bar (nasce 'incerto') e devolve o id.
   insertBar(bar: {
     nome: string; endereco: string; bairro: string; latitude: number; longitude: number;
@@ -20,6 +20,7 @@ export type ImportReport = {
   importadas: number;
   duplicadas: number;
   ja_existentes: number;
+  sementes_completadas: number;
   sem_correspondencia: string[];
   fechadas: string[];
 };
@@ -29,7 +30,8 @@ export type ImportReport = {
 // Devolve: o relatório (lidas, importadas, duplicadas, sem correspondência, fechadas).
 // Regras: sem resultado → relatório, não importa; CLOSED_PERMANENTLY → não importa; duplicados por
 // google_place_id (no arquivo ou já no banco) viram 1 bar; o bairro do Google substitui o do CSV se divergir;
-// cada bar importado recebe 1 evidência seed_otcb_antigo com a data da importação.
+// cada bar importado recebe 1 evidência seed_otcb_antigo com a data da importação; bar existente sem essa
+// evidência (importação interrompida) é completado na rodada seguinte.
 export async function importSeed(
   parsed: { totalLinhas: number; semNome: number; linhas: LegacyRow[] },
   search: (query: string) => Promise<Place | null>,
@@ -42,6 +44,7 @@ export async function importSeed(
     importadas: 0,
     duplicadas: 0,
     ja_existentes: 0,
+    sementes_completadas: 0,
     sem_correspondencia: [],
     fechadas: [],
   };
@@ -62,8 +65,15 @@ export async function importSeed(
       continue;
     }
     vistos.add(place.placeId);
-    if (await repo.barExists(place.placeId)) {
-      report.ja_existentes += 1;
+    const existente = await repo.findBar(place.placeId);
+    if (existente) {
+      // Recupera uma importação interrompida entre o bar e a evidência: completa a semente que faltou.
+      if (!existente.hasSeed) {
+        await repo.insertSeedEvidence(existente.id, now);
+        report.sementes_completadas += 1;
+      } else {
+        report.ja_existentes += 1;
+      }
       continue;
     }
     const barId = await repo.insertBar({

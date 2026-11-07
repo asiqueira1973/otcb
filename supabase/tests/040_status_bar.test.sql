@@ -2,7 +2,7 @@
 -- casos obrigatórios A–J da tabela 11.2.1 e a regra de transmissão de jogos.
 -- Cada caso usa um bar próprio da fixture; nada conta a tabela inteira.
 begin;
-select plan(26);
+select plan(31);
 
 -- Fixture: três usuários anônimos com perfil.
 insert into auth.users (id, aud, role, is_anonymous, instance_id) values
@@ -17,7 +17,8 @@ insert into public.otcb_perfis (id, apelido, maioridade_confirmada_em) values
 -- Um bar por caso (coordenadas fora de SP para não colidir com dados reais).
 insert into public.otcb_bares (id, nome, endereco, bairro, latitude, longitude)
 select ('00000000-0000-0000-0000-00000040000' || c)::uuid, 'Bar caso ' || c, 'Rua Teste', 'Teste40', -10.0, -40.0
-  from unnest(array['a','b','c','d','e','f','9','8','7','6','5']) c;
+  from unnest(array['a','b','c','d','e','f','9','8','7','6','5','4','3','2']) c;
+-- 4 = voto entre tipos, 3 = limite exato −0,5, 2 = decaimento pelo recálculo diário
 -- a=A b=B c=C d=D e=E f=F 9=G 8=H 7=I 6=J 5=transmite
 
 -- Atalho de leitura.
@@ -130,6 +131,33 @@ select throws_ok(
   '22023', 'evidencia_invalida',
   '11.1: combinação fora da tabela é recusada'
 );
+
+-- 11.1: "um voto por pessoa" vale entre tipos — foto de ontem e confirmação negativa de hoje do mesmo
+-- usuário: só a negativa (mais recente) conta.
+insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, usuario_id, data_evidencia, peso, meia_vida_dias) values
+  ('00000000-0000-0000-0000-000000400004', 'tem_brahma', 'positivo', 'foto_colarinhometro', 'usuario', '00000000-0000-0000-0000-0000000040a1', now() - interval '1 day', 0, 1),
+  ('00000000-0000-0000-0000-000000400004', 'tem_brahma', 'negativo', 'confirmacao_usuario', 'usuario', '00000000-0000-0000-0000-0000000040a1', now(), 0, 1);
+select is((select pontuacao_brahma from v40 where caso = '4'), -0.600, '11.1: foto e depois negativa do mesmo usuário → só a negativa conta');
+
+-- 11.2 (2): limite exato de −0,5 já é sem_brahma.
+insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, url_fonte, data_evidencia, peso, meia_vida_dias)
+values ('00000000-0000-0000-0000-000000400003', 'tem_brahma', 'negativo', 'cardapio_site', 'garimpo', 'https://exemplo.test/outra-marca', now(), 0, 1);
+select is((select (status, pontuacao_brahma)::text from v40 where caso = '3'), '(sem_brahma,-0.500)', '11.2: pontuação −0,5 exata → sem_brahma');
+
+-- 7.5: o recálculo diário aplica o decaimento; status_atualizado_em só muda quando o status muda.
+insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, usuario_id, data_evidencia, peso, meia_vida_dias)
+values ('00000000-0000-0000-0000-000000400002', 'tem_brahma', 'positivo', 'foto_colarinhometro', 'usuario',
+        '00000000-0000-0000-0000-0000000040a1', now(), 0, 1);
+update public.otcb_bares set status_atualizado_em = now() - interval '5 days' where id = '00000000-0000-0000-0000-000000400002';
+select public.otcb_recalcular_todos();
+select ok((select status_atualizado_em < now() - interval '4 days' from public.otcb_bares where id = '00000000-0000-0000-0000-000000400002'),
+  '7.5: recalcular sem mudar o status não mexe em status_atualizado_em');
+update public.otcb_evidencias set data_evidencia = now() - interval '120 days' where bar_id = '00000000-0000-0000-0000-000000400002';
+select public.otcb_recalcular_todos();
+select is((select (status, pontuacao_brahma)::text from v40 where caso = '2'), '(incerto,0.397)',
+  '7.5: o recálculo diário aplica o decaimento (1,0 × 0,5^(120/90) ≈ 0,397)');
+select ok((select status_atualizado_em > now() - interval '1 minute' from public.otcb_bares where id = '00000000-0000-0000-0000-000000400002'),
+  '7.5: status mudou (confirmado → incerto) → status_atualizado_em atualizado');
 
 select * from finish();
 rollback;

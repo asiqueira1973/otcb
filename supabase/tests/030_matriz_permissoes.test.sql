@@ -2,7 +2,7 @@
 -- simulando dois usuários (A, B) e um admin. Perfis e confirmações/sugestões têm testes próprios
 -- (010 e 060). Só lê dados da fixture.
 begin;
-select plan(44);
+select plan(51);
 
 -- ===== Fixture (como superusuário) =====
 insert into auth.users (id, aud, role, is_anonymous, instance_id) values
@@ -31,7 +31,8 @@ insert into public.otcb_fotos (id, usuario_id, bar_id, distancia_bar_metros, cam
 
 insert into public.otcb_opinioes (id, usuario_id, bar_id, texto, nota, status) values
   ('00000000-0000-0000-0000-0000003e00a1', '00000000-0000-0000-0000-0000000030a1', '00000000-0000-0000-0000-000000300001', 'Chopp muito bem tirado', 5, 'publicada'),
-  ('00000000-0000-0000-0000-0000003e00b2', '00000000-0000-0000-0000-0000000030b2', '00000000-0000-0000-0000-000000300001', 'Opinião oculta de B', 2, 'oculta_moderacao');
+  ('00000000-0000-0000-0000-0000003e00b2', '00000000-0000-0000-0000-0000000030b2', '00000000-0000-0000-0000-000000300001', 'Opinião oculta de B', 2, 'oculta_moderacao'),
+  ('00000000-0000-0000-0000-0000003e00b3', '00000000-0000-0000-0000-0000000030b2', '00000000-0000-0000-0000-000000300002', 'Outra oculta de B aqui', 1, 'oculta_admin');
 
 insert into public.otcb_mensagens (usuario_id, papel, conteudo) values
   ('00000000-0000-0000-0000-0000000030a1', 'usuario', 'mensagem de A'),
@@ -39,7 +40,7 @@ insert into public.otcb_mensagens (usuario_id, papel, conteudo) values
 
 insert into public.otcb_jogos (id_externo, competicao, mandante, visitante, inicio)
 values ('t30-jogo', 'Brasileirão', 'Time A', 'Time B', now() + interval '1 day');
-insert into public.otcb_execucoes_garimpo (tipo) values ('revisita');
+insert into public.otcb_execucoes_garimpo (id, tipo) values ('00000000-0000-0000-0000-0000003c0001', 'revisita');
 
 insert into storage.objects (bucket_id, name, owner_id) values
   ('otcb-fotos', '00000000-0000-0000-0000-0000000030a1/00000000-0000-0000-0000-0000003f00a1.jpg', '00000000-0000-0000-0000-0000000030a1'),
@@ -80,6 +81,10 @@ select throws_ok($$ update public.otcb_fotos set nota_colarinho = 10 where id = 
 update public.otcb_fotos set excluido_em = now() where id = '00000000-0000-0000-0000-0000003f00b2';
 select lives_ok($$ update public.otcb_fotos set excluido_em = now() where id = '00000000-0000-0000-0000-0000003f00a1' $$,
   'A apaga (soft delete) a própria foto');
+select throws_ok($$ update public.otcb_fotos set excluido_em = null where id = '00000000-0000-0000-0000-0000003f00a1' $$,
+  '42501', null, 'A não "desapaga" a foto (soft delete só marca a exclusão)');
+select throws_ok($$ update public.otcb_fotos set excluido_em = now() + interval '100 years' where id = '00000000-0000-0000-0000-0000003f00a1' $$,
+  '42501', null, 'A não grava data de exclusão no futuro');
 
 -- Carimbos (5.2: vê só os próprios; nascem só por trigger)
 select is((select count(*)::int from public.otcb_carimbos where bar_id = '00000000-0000-0000-0000-000000300001'), 1, 'A vê só o próprio carimbo');
@@ -101,7 +106,7 @@ select throws_ok($$ insert into public.otcb_denuncias (opiniao_id, usuario_id) v
   '42501', null, 'A não denuncia a própria opinião');
 select throws_ok($$ insert into public.otcb_denuncias (opiniao_id, usuario_id) values ('00000000-0000-0000-0000-0000003e00b2', '00000000-0000-0000-0000-0000000030b2') $$,
   '42501', null, 'A não denuncia em nome de B');
-select is((select count(*)::int from public.otcb_denuncias), 0, 'A não lê denúncias');
+select is((select count(*)::int from public.otcb_denuncias where opiniao_id in ('00000000-0000-0000-0000-0000003e00a1', '00000000-0000-0000-0000-0000003e00b2')), 0, 'A não lê denúncias');
 
 -- Mensagens (5.2: vê e apaga só as próprias)
 select is((select count(*)::int from public.otcb_mensagens where conteudo like 'mensagem de %'), 1, 'A vê só as próprias mensagens');
@@ -114,7 +119,7 @@ select throws_ok($$ insert into public.otcb_mensagens (usuario_id, papel, conteu
 select is((select count(*)::int from public.otcb_jogos where id_externo = 't30-jogo'), 1, 'A vê os jogos');
 select throws_ok($$ insert into public.otcb_jogos (id_externo, competicao, mandante, visitante, inicio) values ('x', 'x', 'x', 'x', now()) $$,
   '42501', null, 'A não grava jogos');
-select is((select count(*)::int from public.otcb_execucoes_garimpo), 0, 'A não vê execuções do garimpo');
+select is((select count(*)::int from public.otcb_execucoes_garimpo where id = '00000000-0000-0000-0000-0000003c0001'), 0, 'A não vê execuções do garimpo');
 
 -- Storage (6.1: dono lê a própria pasta; escrita só serviço)
 select is((select count(*)::int from storage.objects where bucket_id = 'otcb-fotos' and name like '00000000-0000-0000-0000-0000000030%'), 1,
@@ -153,7 +158,13 @@ select is((select count(*)::int from public.otcb_denuncias where motivo = 'ofens
 select lives_ok($$ update public.otcb_opinioes set status = 'oculta_admin', motivo_ocultacao = 'teste' where id = '00000000-0000-0000-0000-0000003e00a1' $$,
   'admin oculta opinião');
 select is((select count(*)::int from public.otcb_mensagens where conteudo like 'mensagem de %'), 0, 'admin NÃO lê mensagens de ninguém (privacidade, 5.2)');
-select is((select count(*)::int from public.otcb_execucoes_garimpo where tipo = 'revisita'), 1, 'admin vê execuções do garimpo');
+select is((select count(*)::int from public.otcb_execucoes_garimpo where id = '00000000-0000-0000-0000-0000003c0001'), 1, 'admin vê execuções do garimpo');
+select is((select count(*)::int from public.otcb_opinioes where id = '00000000-0000-0000-0000-0000003e00b3'), 1, 'admin vê opinião oculta de outra pessoa');
+select lives_ok($$ delete from public.otcb_opinioes where id = '00000000-0000-0000-0000-0000003e00b3' $$, 'admin apaga opinião de outra pessoa');
+select is((select count(*)::int from public.otcb_opinioes where id = '00000000-0000-0000-0000-0000003e00b3'), 0, 'a opinião apagada pelo admin sumiu');
+select throws_ok($$ insert into public.otcb_carimbos (usuario_id, bar_id) values ('00000000-0000-0000-0000-0000000030ad', '00000000-0000-0000-0000-000000300001') $$,
+  '42501', null, 'admin também não cria carimbo (só trigger)');
+select lives_ok($$ update public.otcb_bares set excluido_em = now() where id = '00000000-0000-0000-0000-000000300001' $$, 'admin exclui bar (soft delete)');
 
 -- ===================================================================== anon
 set local role anon;

@@ -109,15 +109,18 @@ Apagar o perfil apaga em cascata as fotos, carimbos, opiniões, denúncias e men
 | trigger `otcb_trg_evidencia_define_peso` | before insert | `otcb_evidencias` | Preenche `peso` e `meia_vida_dias` pela regra, ignorando o que vier do chamador. |
 | `otcb_recalcular_bar(bar)` | definer, só serviço | — | Regras 11.1, 11.2 e 11.3: soma as forças `peso × 0,5^(idade/meia-vida)`, contando só a evidência mais recente de cada usuário por assunto; decide o status na ordem fechado → sem_brahma → confirmado → provavel → incerto; grava a pontuação, o status, `transmite_jogos` e a data quando o status muda. |
 | trigger `otcb_trg_evidencia_recalcula` | after insert/delete | `otcb_evidencias` | Recalcula o bar da evidência. |
-| `otcb_recalcular_todos()` | definer, só serviço | cron diário | Recalcula os bares ativos, para aplicar o decaimento. |
+| `otcb_recalcular_todos()` | definer, só serviço | cron diário | Recalcula status e pontuação dos bares ativos (decaimento) e reconstrói os agregados de fotos e opiniões. |
 | `otcb_bar_mais_proximo(lat, lng)` | definer, só serviço | Colarinhômetro (8.6) | Bar não excluído e não fechado a até 150 m; empate vai para a maior pontuação (11.4). |
-| trigger `otcb_trg_foto_processa` | after insert e update de `excluido_em` | `otcb_fotos` | Regra 11.4: com chopp, bar e confirmação do usuário, cria a evidência `foto_colarinhometro` e o carimbo (no máximo 1 por bar e 2 por dia de SP). Também recalcula a média e a contagem de fotos não excluídas (11.5). |
+| trigger `otcb_trg_foto_processa` | after insert, update de `excluido_em` e delete | `otcb_fotos` | Regra 11.4: com chopp, bar e confirmação do usuário, cria a evidência `foto_colarinhometro` e o carimbo (no máximo 1 por bar e 2 por dia de SP). Também recalcula a média e a contagem de fotos não excluídas (11.5). |
 | trigger `otcb_trg_opiniao_agrega` | after insert/update/delete | `otcb_opinioes` | Média e contagem das publicadas; abaixo de 3 publicadas, zera o resumo (11.8). |
 | trigger `otcb_trg_denuncia_conta` | after insert | `otcb_denuncias` | Soma a denúncia; na 3ª, a opinião vira `oculta_denuncias` (11.7). |
 | triggers `otcb_trg_atualizado_em` e `otcb_trg_perfil_protege_papel` | before update | perfis, bares, opiniões, jogos | `atualizado_em = now()`; o papel não muda para quem não é admin. |
 | `otcb_usuario_atual()` | definer | RPCs | Devolve `auth.uid()` de quem tem perfil; sem perfil, erro `nao_autenticado`. |
 | `otcb_inserir_confirmacao(...)` | definer, interna | RPCs | Grava a confirmação. Uma segunda do mesmo bar e assunto no dia de SP gera `limite_confirmacao`. |
 | `otcb_limpeza_diaria()` | definer, só serviço | cron diário | Apaga mensagens com mais de 30 dias e jogos com mais de 2 dias desde o início. |
+| `otcb_agregar_fotos_do_bar(bar)` / `otcb_agregar_opinioes_do_bar(bar)` | definer, só serviço | triggers e recálculo diário | Reconstroem os agregados de fotos (11.5) e de opiniões (11.7/11.8) a partir das tabelas filhas (7.7). |
+| `otcb_anonimizar_evidencias(usuario)` | definer, só serviço | `otcb-apagar-conta` e trigger | Apaga as evidências superadas da pessoa (que já não contavam pela 11.1) e anula `usuario_id` das restantes; a pontuação e o status dos bares não mudam. |
+| trigger `otcb_trg_perfil_anonimiza` | before delete | `otcb_perfis` | Chama `otcb_anonimizar_evidencias`, inclusive quando o perfil é apagado pelo Studio. |
 
 ### RPCs do app (13.4)
 
@@ -141,7 +144,7 @@ Todas valem só para `authenticated` e usam `auth.uid()`.
 | `otcb_perfis` | `otcb_perfis_le_proprio`, `otcb_perfis_admin_le_todos`, `otcb_perfis_insere_proprio` (sempre com `papel = 'usuario'`), `otcb_perfis_atualiza_proprio` |
 | `otcb_bares` | `otcb_bares_le_ativos` (`excluido_em is null`), `otcb_bares_admin_tudo` |
 | `otcb_evidencias` | `otcb_evidencias_admin_le` |
-| `otcb_fotos` | `otcb_fotos_le_propria`, `otcb_fotos_admin_le`, `otcb_fotos_exclui_propria` (o grant só deixa alterar `excluido_em`) |
+| `otcb_fotos` | `otcb_fotos_le_propria`, `otcb_fotos_admin_le`, `otcb_fotos_exclui_propria` (o grant só deixa alterar `excluido_em`, que só pode ser marcado: nunca nulo nem no futuro) |
 | `otcb_carimbos` | `otcb_carimbos_le_proprios`, `otcb_carimbos_admin_le` |
 | `otcb_opinioes` | `otcb_opinioes_le_publicadas`, `otcb_opinioes_le_proprias`, `otcb_opinioes_admin_tudo`, `otcb_opinioes_apaga_propria` |
 | `otcb_denuncias` | `otcb_denuncias_insere_propria` (em nome próprio e nunca sobre a própria opinião), `otcb_denuncias_admin_le` |
@@ -205,7 +208,11 @@ Os jobs que chamam Edge Functions (revisita, coordenadas, resumos, jogos e desco
 
 ### Edge Function `otcb-apagar-conta` (13.8)
 - `POST`, sem corpo. O id do usuário vem só do JWT.
-- Ordem: arquivos de `{uid}/` no bucket, depois `usuario_id = null` nas evidências, depois o perfil (com as filhas em cascata), por fim o usuário em `auth.users`.
+- Ordem:
+  1. arquivos de `{uid}/` no bucket (só arquivos, então uma subpasta não trava o laço);
+  2. `otcb_anonimizar_evidencias`;
+  3. o perfil, com as filhas em cascata (o trigger de fotos atualiza as médias);
+  4. o usuário em `auth.users`.
 - Respostas: 200 `{ok: true}`; 401 sem JWT válido; 405 fora de POST; 500 `{error: 'falha_exclusao'}`, sem dado pessoal no log.
 - No app, `deleteAccountAndSignOut` também trata o `error` que o supabase-js devolve em vez de lançar.
 
@@ -242,4 +249,9 @@ Os jobs que chamam Edge Functions (revisita, coordenadas, resumos, jogos e desco
 | Advisors de `otcb_` | Avisos aceitos, nenhum ERROR: RPCs `security definer` executáveis por `authenticated` (a 13.4 exige), políticas acessíveis ao usuário anônimo (a identidade do app é anônima), políticas permissivas múltiplas (nomes da 6.1) e índices ainda sem uso. | Todos vêm do próprio spec. |
 | Microtextos fora da seção 15 | Em `src/lib/copy.ts`, aprovados pelo Alexandre em 07/11/2026. | O spec não traz texto para rótulos e erros de formato. |
 | Mascote | Ilustrações do Higgsfield; no modo escuro a Bolacha ganha um halo claro. | Os traços cor de tinta sumiriam no fundo escuro (16.5). |
+| Anonimização (7.4 × 11.1) | As evidências superadas da pessoa são **apagadas** antes de desvincular as restantes. | A 7.4 fala só em desvincular, mas sem `usuario_id` todas passariam a contar (bug do verifier). As superadas tinham peso zero, então a pontuação fica idêntica. |
+| 5.2 × 6.1 (visibilidade de bares) | O RLS segue a 6.1 (`excluido_em is null`); o filtro "confirmado/provavel/incerto acima do piso" fica na busca (11.9). | Os nomes e as regras da 6.1 são literais; o app e o agente chegam aos bares pela busca. |
+| 5.2 × 6.1 ("admin apaga qualquer foto") | Sem política extra. | A 6.1 não a prevê; o admin opera pelo Studio (5.1). |
+| 11.2 (1), janela de 30 dias | Aplicada só ao "fechou" de usuários; o `status_google` fechado vale a qualquer tempo. | Leitura do texto da 11.2 (caso I da 11.2.1). |
+| Semente | O relatório tem `ja_existentes` e `sementes_completadas` (recuperação de importação interrompida). | Idempotência e atomicidade sem transação entre chamadas. |
 | **Pendente para o 8.4/8.8** | O apelido dos outros usuários nas opiniões é público (seção 20), mas o RLS de perfis só deixa ver o próprio. | Vai precisar de uma função ou view nesses épicos. |

@@ -33,7 +33,11 @@ function memoryRepo(existing: string[] = []) {
   const bares: { id: string; google_place_id: string; bairro: string; tem_balcao: boolean | null }[] = [];
   const evidencias: { barId: string; at: Date }[] = [];
   const repo: SeedRepo = {
-    barExists: (placeId) => Promise.resolve(existing.includes(placeId) || bares.some((b) => b.google_place_id === placeId)),
+    findBar: (placeId) => {
+      if (existing.includes(placeId)) return Promise.resolve({ id: `existente-${placeId}`, hasSeed: true });
+      const bar = bares.find((b) => b.google_place_id === placeId);
+      return Promise.resolve(bar ? { id: bar.id, hasSeed: evidencias.some((e) => e.barId === bar.id) } : null);
+    },
     insertBar: (bar) => {
       const id = `bar-${bares.length + 1}`;
       bares.push({ id, google_place_id: bar.google_place_id, bairro: bar.bairro, tem_balcao: bar.tem_balcao });
@@ -113,6 +117,18 @@ describe('importSeed', () => {
     expect(bares).toHaveLength(1);
     expect(evidencias).toHaveLength(1);
     expect(second).toMatchObject({ importadas: 0, ja_existentes: 1 });
+  });
+
+  it('importação interrompida (bar sem evidência) é completada na rodada seguinte', async () => {
+    const parsed = { totalLinhas: 1, semNome: 0, linhas: [{ nome: 'Belmonte', endereco: 'Rua Z', bairro: 'Itaim', temBalcao: null }] };
+    const { repo, bares, evidencias } = memoryRepo();
+    const falha = { ...repo, insertSeedEvidence: () => Promise.reject(new Error('rede')) };
+    await expect(importSeed(parsed, fakeSearch, falha)).rejects.toThrow('rede');
+    expect(bares).toHaveLength(1);
+    expect(evidencias).toHaveLength(0);
+    const second = await importSeed(parsed, fakeSearch, repo);
+    expect(second).toMatchObject({ importadas: 0, sementes_completadas: 1 });
+    expect(evidencias).toHaveLength(1);
   });
 });
 

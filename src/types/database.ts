@@ -234,6 +234,15 @@ isOneToOne: false
               "confirmacoes_60_dias": number,"ultima_confirmacao_em": string
             }[]
                            },
+"otcb_agregar_fotos_do_bar":
+{ Args: { "p_bar_id": string }; Returns: undefined
+                           },
+"otcb_agregar_opinioes_do_bar":
+{ Args: { "p_bar_id": string }; Returns: undefined
+                           },
+"otcb_anonimizar_evidencias":
+{ Args: { "p_usuario": string }; Returns: number
+                           },
 "otcb_bar_mais_proximo":
 { Args: { "p_latitude": number,"p_longitude": number }; Returns: {
               "bar_id": string,"distancia_metros": number

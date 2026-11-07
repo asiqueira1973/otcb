@@ -2,7 +2,7 @@
 -- otcb_buscar_bares (11.9), otcb_detalhes_bar, otcb_meu_passaporte (11.11), agregação de opiniões (11.7/11.8),
 -- denúncias (11.7) e limpeza (11.14). Só lê dados da fixture.
 begin;
-select plan(38);
+select plan(41);
 
 insert into auth.users (id, aud, role, is_anonymous, instance_id) values
   ('00000000-0000-0000-0000-0000000060a1', 'authenticated', 'authenticated', true, '00000000-0000-0000-0000-000000000000'),
@@ -128,6 +128,18 @@ select is((public.otcb_meu_passaporte() -> 'selos' -> 0 ->> 'conquistado')::bool
 select is((select (c ->> 'carimbos')::int from jsonb_array_elements(public.otcb_meu_passaporte() -> 'colecoes_bairro') c
             where c ->> 'bairro' = 'Vila Teste Sessenta'), 1, '11.11: coleção do bairro conta o carimbo');
 select is((public.otcb_meu_passaporte() -> 'colecao_classicos' ->> 'carimbos')::int, 1, '11.11: coleção Clássicos');
+-- Informante: A tem tem_brahma positivo no bar 3 (0,2 + 0,6 = 0,8 → provável) e no bar 2 (sugestão casada,
+-- provável), mais uma confirmação de transmite_jogos no bar 3 e 5 bares sugeridos (incertos, 0,3).
+-- Só as duas de tem_brahma em bar provável "ajudaram"; a de transmite_jogos e as dos incertos não contam.
+select is((select (s ->> 'progresso')::int from jsonb_array_elements(public.otcb_meu_passaporte() -> 'selos') s
+            where s ->> 'selo' = 'informante'), 2, '11.11: Informante conta só tem_brahma positivo em bar confirmado/provável');
+reset role;
+-- Carimbo em bar incerto do bairro (bar 4, semente velha) também conta na coleção do bairro.
+insert into public.otcb_carimbos (usuario_id, bar_id) values ('00000000-0000-0000-0000-0000000060a1', '00000000-0000-0000-0000-000000600004');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000060a1","role":"authenticated"}', true);
+select is((select (c ->> 'carimbos')::int from jsonb_array_elements(public.otcb_meu_passaporte() -> 'colecoes_bairro') c
+            where c ->> 'bairro' = 'Vila Teste Sessenta'), 2, '11.11: carimbo em bar não confirmado do bairro também conta');
 reset role;
 
 -- Opiniões: média só das publicadas com nota; resumo volta a nulo abaixo de 3 (11.8).
@@ -160,6 +172,8 @@ insert into public.otcb_jogos (id_externo, competicao, mandante, visitante, inic
 select public.otcb_limpeza_diaria();
 select is((select array_agg(conteudo order by conteudo) from public.otcb_mensagens where conteudo like 't60 %'), array['t60 nova'],
   '11.14: mensagens com mais de 30 dias são apagadas');
+select is((select array_agg(id_externo order by id_externo) from public.otcb_jogos where id_externo like 't60-%'), array['t60-novo'],
+  '11.14: jogos com início há mais de 2 dias são apagados');
 
 select * from finish();
 rollback;

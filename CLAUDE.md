@@ -19,7 +19,7 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 | Comando | Saída saudável (código 0) |
 |---|---|
 | `npm run typecheck` | sem saída |
-| `npm run lint` | sem saída |
+| `npm run lint` | só as linhas `env: load/export` do Expo (nomes, nunca valores) |
 | `npm test` | `Tests: N passed, N total` |
 | `npm run test:db` | `All tests successful.` / `Result: PASS` (exige `supabase start`) |
 | `npm run test:functions` | `ok \| N passed \| 0 failed` |
@@ -35,6 +35,7 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - Evidência de usuário só via RPC (`otcb_confirmar_bar`/`otcb_sugerir_bar`) ou trigger de foto; cliente não tem grant de insert. Limites diários usam o dia de SP (`otcb_hoje_sp`).
 - Semente: `npm run seed:import` (lê `.env` + `.env.local`; idempotente). `.env.local` tem segredos e nunca é exibido.
 - pg_cron roda em UTC (SP = UTC−3).
+- Anonimizar evidência só por `otcb_anonimizar_evidencias` (apaga as superadas antes de anular `usuario_id`; senão quebra o "um voto por pessoa").
 - O agente de IA não grava nada no banco; toda escrita do usuário passa por card (8.5, 13.3).
 - Nenhuma mecânica conta quantidade de chopp (princípio 3).
 - Segredos só em `supabase/functions/` e `scripts/` (hook `guard-secrets`); o app só tem `EXPO_PUBLIC_*`.

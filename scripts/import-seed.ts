@@ -24,10 +24,17 @@ const admin = createClient(url, serviceKey, { auth: { persistSession: false, aut
 const csv = readFileSync(resolve(__dirname, '../supabase/seed/estabelecimentos_otcb_antigo.csv'), 'utf8');
 
 importSeed(parseLegacyCsv(csv), (q) => searchPlace(q, googleKey, fetch), {
-  async barExists(placeId) {
+  async findBar(placeId) {
     const { data, error } = await admin.from('otcb_bares').select('id').eq('google_place_id', placeId).maybeSingle();
     if (error) throw error;
-    return !!data;
+    if (!data) return null;
+    const { count, error: countError } = await admin
+      .from('otcb_evidencias')
+      .select('id', { count: 'exact', head: true })
+      .eq('bar_id', data.id)
+      .eq('tipo', 'seed_otcb_antigo');
+    if (countError) throw countError;
+    return { id: data.id as string, hasSeed: (count ?? 0) > 0 };
   },
   async insertBar(bar) {
     const { data, error } = await admin.from('otcb_bares').insert(bar).select('id').single();
