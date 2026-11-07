@@ -1,64 +1,168 @@
 # OTCB — Documentação técnica
 
-Este documento descreve o sistema **como ele está implementado** (spec seção 19) e é atualizado no mesmo commit de cada mudança. Estado atual: épicos 8.0 e 8.1.
-
-## 1. Modelo de dados
+Este documento descreve o sistema **como ele está implementado** (spec seção 19) e é atualizado no mesmo commit de cada mudança. Estado atual: épicos 8.0, 8.1 e 8.2.
 
 O banco é o Supabase "BANCO DE TESTE" (`jeesdmfcrmhyufwzwzwt`), compartilhado com outros apps. Por isso todo objeto do OTCB leva o prefixo `otcb_`.
 
-### Enum `otcb_papel`
-O papel do usuário no app.
+Extensões usadas, liberadas pelo Alexandre: `pg_trgm` e `unaccent` (no schema `extensions`) e `pg_cron`.
 
-| Valor | Significado |
+## 1. Modelo de dados
+
+### Enums
+
+| Enum | Valores e significado |
 |---|---|
-| `usuario` | Qualquer adulto que abriu o app. É o padrão. |
-| `admin` | Opera a base pelo Supabase Studio. Só é promovido por SQL (seção 5.1). |
+| `otcb_papel` | `usuario` é qualquer adulto que abriu o app (o padrão). `admin` opera a base pelo Studio e só é promovido por SQL (5.1). |
+| `otcb_status_bar` | `confirmado`: tem chopp Brahma, com pontuação ≥ 1,0. `provavel`: ≥ 0,5. `incerto`: aparece como "a confirmar". `sem_brahma`: ≤ −0,5. `fechado`: o bar fechou. |
+| `otcb_assunto_evidencia` | Sobre o que é a evidência: se `tem_brahma`, se `transmite_jogos` ou o `funcionamento` do bar (aberto ou fechado). |
+| `otcb_sinal_evidencia` | `positivo` confirma, `negativo` nega, `fechado` diz que o bar fechou (só vale com `funcionamento`). |
+| `otcb_tipo_evidencia` | A fonte: `foto_colarinhometro`, `confirmacao_usuario`, `sugestao_usuario`, `cardapio_site`, `pagina_web`, `avaliacao_google`, `status_google` e `seed_otcb_antigo` (CSV antigo). |
+| `otcb_origem_evidencia` | Quem trouxe a evidência: `usuario`, `garimpo` ou `seed`. |
+| `otcb_status_opiniao` | `publicada`, `oculta_moderacao` (recusada pela IA), `oculta_denuncias` (3 denúncias) ou `oculta_admin`. |
+| `otcb_papel_mensagem` | Autor da mensagem do chat: `usuario`, `assistente` ou `sistema` (registro de ação feita por card). |
+| `otcb_tipo_execucao` | Modo do garimpo: `descoberta`, `revisita`, `coordenadas`, `resumos` ou `jogos`. |
+| `otcb_status_execucao` | `em_andamento`, `concluida` ou `falhou`. |
 
-### Tabela `otcb_perfis`
-Dados do usuário no app, com uma linha por usuário anônimo.
+### Tabelas
 
-| Coluna | Significado |
-|---|---|
-| `id` | O mesmo id do usuário anônimo em `auth.users`. Se o usuário é apagado, o perfil vai junto. |
-| `apelido` | Nome público que aparece nas opiniões. Tem de 3 a 20 caracteres (letras sem acento, números, ponto e sublinhado) e é único sem diferenciar maiúsculas. |
-| `papel` | `usuario` ou `admin`. |
-| `maioridade_confirmada_em` | Instante em que a pessoa declarou ter 18 anos ou mais. A data de nascimento **não é gravada**. |
-| `time_do_coracao` | Time de futebol, opcional. Fica nulo quando não informado. |
-| `criado_em`, `atualizado_em` | Data de criação e da última alteração. |
+**`otcb_perfis`**: o usuário no app, com uma linha por usuário anônimo.
+- `id`: o mesmo id de `auth.users`. Se o usuário é apagado, o perfil vai junto.
+- `apelido`: público nas opiniões. Tem de 3 a 20 caracteres (`[A-Za-z0-9_.]`) e é único sem diferenciar maiúsculas.
+- `papel`.
+- `maioridade_confirmada_em`: o instante da declaração de 18+. A data de nascimento **não é gravada**.
+- `time_do_coracao`: opcional.
+- `criado_em` e `atualizado_em`.
+
+**`otcb_bares`**: cada bar conhecido.
+- `nome`, `endereco` e `bairro`.
+- `latitude` e `longitude`, renovadas pela regra 11.10. `coordenadas_atualizadas_em` registra quando.
+- `google_place_id`: único; fica nulo enquanto o bar não foi casado com o Google.
+- **Campos calculados, nunca editados à mão:**
+  - `status`, `pontuacao_brahma` (regras 11.1 e 11.2) e `status_atualizado_em` (muda só quando o status muda);
+  - `transmite_jogos` (11.3; nulo = sem informação);
+  - `nota_colarinho_media` e `qtd_fotos_avaliadas` (11.5);
+  - `nota_opinioes_media` e `qtd_opinioes` (só opiniões publicadas);
+  - `resumo_opinioes` e `resumo_atualizado_em` (11.8; nulos com menos de 3 opiniões publicadas).
+- `tem_balcao`: nulo = sem informação.
+- `classico`: curadoria manual do admin.
+- `excluido_em`: soft delete.
+- `criado_em` e `atualizado_em`.
+
+**`otcb_evidencias`**: tudo que indica se o bar tem Brahma, passa jogo ou está aberto.
+- `bar_id`, `assunto`, `sinal`, `tipo` e `origem`.
+- `usuario_id`: nulo para garimpo, seed e contas apagadas.
+- `foto_id`: quando a evidência veio de uma foto.
+- `url_fonte` e `trecho`: o trecho tem até 300 caracteres. `(bar, assunto, url_fonte)` é único quando a URL existe.
+- `data_evidencia`: a data do conteúdo.
+- `peso` e `meia_vida_dias`: copiados da regra 11.1 no insert.
+
+**`otcb_fotos`**: cada foto do Colarinhômetro.
+- `usuario_id`.
+- `bar_id` e `distancia_bar_metros`: nulos sem bar a até 150 m.
+- `caminho_storage` = `{usuario_id}/{id}.jpg`. Um CHECK obriga a pasta a ser a do dono.
+- `e_chopp` (resposta da IA) e `usuario_confirmou_brahma` (resposta do usuário).
+- As quatro notas parciais e `nota_colarinho`, todas de 0 a 10 (11.5).
+- `comentario_ia` e `modelo_ia`.
+- `excluido_em`: soft delete pelo dono.
+
+**`otcb_carimbos`**: o Passaporte, com 1 carimbo por usuário por bar. Guarda a foto que o gerou, que fica nula se a foto for apagada.
+
+**`otcb_opinioes`**: 1 por usuário por bar. Texto de 10 a 500 caracteres, `nota` de 1 a 5 ou vazia, `status`, `motivo_ocultacao` e `qtd_denuncias`.
+
+**`otcb_denuncias`**: 1 por usuário por opinião, com `motivo` opcional.
+
+**`otcb_mensagens`**: o histórico do chat (`papel`, `conteudo`, `blocos` em jsonb). Fica guardado por 30 dias.
+
+**`otcb_jogos`**: os jogos do football-data.org (`id_externo` único). São apagados 2 dias depois do início.
+
+**`otcb_execucoes_garimpo`**: o registro de cada execução do garimpo (tipo, status, cursor, contadores e `erros`).
+
+**Bucket `otcb-fotos`**: privado, aceita só JPEG de até 1 MB e usa uma pasta por usuário.
 
 ## 2. Relacionamentos
 
 ```
-auth.users (1) ──── (0..1) otcb_perfis
+auth.users 1──0..1 otcb_perfis
+otcb_perfis 1──N otcb_fotos ──N──0..1 otcb_bares
+otcb_perfis 1──N otcb_carimbos N──1 otcb_bares          (único por usuário+bar)
+otcb_perfis 1──N otcb_opinioes N──1 otcb_bares          (único por usuário+bar)
+otcb_opinioes 1──N otcb_denuncias N──1 otcb_perfis      (único por opinião+usuário)
+otcb_bares 1──N otcb_evidencias N──0..1 otcb_perfis     (on delete set null)
+otcb_evidencias N──0..1 otcb_fotos ; otcb_carimbos N──0..1 otcb_fotos   (on delete set null)
+otcb_perfis 1──N otcb_mensagens
+otcb_jogos e otcb_execucoes_garimpo: isoladas
 ```
 
-Cada usuário anônimo tem no máximo um perfil. O perfil só nasce depois da confirmação de maioridade e da escolha do apelido. Um usuário sem perfil está no meio do onboarding ou abandonou o app.
+Apagar o perfil apaga em cascata as fotos, carimbos, opiniões, denúncias e mensagens do usuário. As evidências do usuário são preservadas e ficam sem dono (7.4).
 
 ## 3. Regras de negócio no banco
 
-| Nome | Tipo | Onde atua | Quando dispara | O que faz |
-|---|---|---|---|---|
-| `otcb_e_admin()` | Função `security definer`, `search_path` fixo | — | Chamada pelas políticas | Diz se o usuário atual tem papel `admin`. |
-| `otcb_definir_atualizado_em()` + trigger `otcb_trg_atualizado_em` | Trigger before update | `otcb_perfis` | A cada update | Grava `atualizado_em = now()`. |
-| `otcb_protege_papel()` + trigger `otcb_trg_perfil_protege_papel` | Trigger before update | `otcb_perfis` | Update que muda `papel` | Recusa com `papel_protegido` (42501) quando quem muda é um usuário logado sem papel admin. O service role passa, e é assim que o admin é promovido. |
-| `otcb_perfis_apelido_unico` (índice) | Índice único | `otcb_perfis` | Insert/update | Garante apelido único em `lower(apelido)`. O erro chega como 23505. |
-| `otcb_perfis_apelido_formato` (CHECK) | Restrição | `otcb_perfis` | Insert/update | Aplica a regra 11.7. O erro chega como 23514. |
+### Funções e triggers
 
-**Políticas de RLS em `otcb_perfis`.** Todas valem só para `authenticated`, e o usuário anônimo é `authenticated`.
+| Nome | Tipo | Onde / quando | O que faz |
+|---|---|---|---|
+| `otcb_e_admin()` | definer | políticas | Diz se o usuário atual é admin. |
+| `otcb_normalizar(texto)` | imutável | buscas e casamento | Tira acentos, passa para minúsculas, junta espaços e remove os prefixos "bar", "boteco" e "restaurante". |
+| `otcb_distancia_metros` | imutável | buscas, fotos e casamento | Distância haversine em metros. |
+| `otcb_hoje_sp()` / `otcb_dia_sp(t)` | — | limites diários | Dia civil em `America/Sao_Paulo` (11.12). |
+| `otcb_regra_evidencia(tipo, assunto, sinal)` | imutável, só serviço | — | A tabela 11.1, em um só lugar (24.11). Combinação fora dela gera `evidencia_invalida`. |
+| trigger `otcb_trg_evidencia_define_peso` | before insert | `otcb_evidencias` | Preenche `peso` e `meia_vida_dias` pela regra, ignorando o que vier do chamador. |
+| `otcb_recalcular_bar(bar)` | definer, só serviço | — | Regras 11.1, 11.2 e 11.3: soma as forças `peso × 0,5^(idade/meia-vida)`, contando só a evidência mais recente de cada usuário por assunto; decide o status na ordem fechado → sem_brahma → confirmado → provavel → incerto; grava a pontuação, o status, `transmite_jogos` e a data quando o status muda. |
+| trigger `otcb_trg_evidencia_recalcula` | after insert/delete | `otcb_evidencias` | Recalcula o bar da evidência. |
+| `otcb_recalcular_todos()` | definer, só serviço | cron diário | Recalcula os bares ativos, para aplicar o decaimento. |
+| `otcb_bar_mais_proximo(lat, lng)` | definer, só serviço | Colarinhômetro (8.6) | Bar não excluído e não fechado a até 150 m; empate vai para a maior pontuação (11.4). |
+| trigger `otcb_trg_foto_processa` | after insert e update de `excluido_em` | `otcb_fotos` | Regra 11.4: com chopp, bar e confirmação do usuário, cria a evidência `foto_colarinhometro` e o carimbo (no máximo 1 por bar e 2 por dia de SP). Também recalcula a média e a contagem de fotos não excluídas (11.5). |
+| trigger `otcb_trg_opiniao_agrega` | after insert/update/delete | `otcb_opinioes` | Média e contagem das publicadas; abaixo de 3 publicadas, zera o resumo (11.8). |
+| trigger `otcb_trg_denuncia_conta` | after insert | `otcb_denuncias` | Soma a denúncia; na 3ª, a opinião vira `oculta_denuncias` (11.7). |
+| triggers `otcb_trg_atualizado_em` e `otcb_trg_perfil_protege_papel` | before update | perfis, bares, opiniões, jogos | `atualizado_em = now()`; o papel não muda para quem não é admin. |
+| `otcb_usuario_atual()` | definer | RPCs | Devolve `auth.uid()` de quem tem perfil; sem perfil, erro `nao_autenticado`. |
+| `otcb_inserir_confirmacao(...)` | definer, interna | RPCs | Grava a confirmação. Uma segunda do mesmo bar e assunto no dia de SP gera `limite_confirmacao`. |
+| `otcb_limpeza_diaria()` | definer, só serviço | cron diário | Apaga mensagens com mais de 30 dias e jogos com mais de 2 dias desde o início. |
 
-| Política | Operação | Regra |
+### RPCs do app (13.4)
+
+Todas exigem `authenticated` e nunca aceitam `anon`.
+
+| RPC | Entrada → saída | Regras e erros |
 |---|---|---|
-| `otcb_perfis_le_proprio` | select | Lê só a própria linha (`id = auth.uid()`). |
-| `otcb_perfis_admin_le_todos` | select | O admin lê todas as linhas. |
-| `otcb_perfis_insere_proprio` | insert | Insere só a própria linha e sempre com `papel = 'usuario'`. |
-| `otcb_perfis_atualiza_proprio` | update | Atualiza só a própria linha. O papel continua protegido pelo trigger. |
+| `otcb_confirmar_bar` | bar, assunto, sinal → `{ok: true}` | `bar_inexistente`, `sinal_invalido` (`funcionamento` só aceita `fechado`; os outros assuntos não aceitam `fechado`), `limite_confirmacao`. |
+| `otcb_sugerir_bar` | nome, endereço, bairro, lat, lng, tem_brahma → `{bar_id, criado}` | Se casa com um bar existente (até 80 m e similaridade ≥ 0,5), grava uma confirmação nele e devolve `criado: false`. Se não casa, cria o bar como `incerto` mais a evidência `sugestao_usuario`. Erros: `limite_sugestao` (5 por dia), `dados_invalidos` (inclusive bar novo com `tem_brahma = false`). |
+| `otcb_buscar_bares` | lat/lng, raio, texto, bairro, filtros → até 8 `CardBar` | Invoker (11.9). Só aparece bar não excluído, com status confirmado, provavel ou incerto e pontuação ≥ 0,1. Raio de 2 km por padrão, até 10 km. Ordena por status e depois por distância. Sem localização, exige texto ou bairro (`localizacao_ou_bairro_obrigatorio`). |
+| `otcb_agregados_confirmacao` | bar → última confirmação e pessoas distintas em 60 dias | Definer; devolve só números, sem dizer quem confirmou. |
+| `otcb_detalhes_bar` | bar → `CardBar` | Definer; erro `bar_inexistente`. |
+| `otcb_meu_passaporte` | — → `{carimbos, colecoes_bairro, colecao_classicos, selos}` | Definer, sempre filtrado por `auth.uid()` (11.11). Os selos são Primeira tirada, Explorador (5, 15 e 30), Andarilho, Olho clínico e Informante. |
 
-**Grants.** `authenticated` pode `select` e `insert`, e pode fazer `update` só nas colunas `apelido`, `time_do_coracao` e `papel` (migration `20261107210000`).
-- `papel` fica no grant para que quem decide seja o trigger `otcb_trg_perfil_protege_papel`.
-- `maioridade_confirmada_em` e `criado_em` não podem ser reescritos pelo cliente.
-- Não há `delete`, que fica só com a Edge Function. `anon` não acessa nada.
+### Políticas (6.1)
 
-**Jobs do `pg_cron`.** Nenhum ainda. A extensão não está instalada no BANCO DE TESTE e entra no 8.2/8.3.
+Todas valem só para `authenticated` e usam `auth.uid()`.
+
+| Tabela | Políticas |
+|---|---|
+| `otcb_perfis` | `otcb_perfis_le_proprio`, `otcb_perfis_admin_le_todos`, `otcb_perfis_insere_proprio` (sempre com `papel = 'usuario'`), `otcb_perfis_atualiza_proprio` |
+| `otcb_bares` | `otcb_bares_le_ativos` (`excluido_em is null`), `otcb_bares_admin_tudo` |
+| `otcb_evidencias` | `otcb_evidencias_admin_le` |
+| `otcb_fotos` | `otcb_fotos_le_propria`, `otcb_fotos_admin_le`, `otcb_fotos_exclui_propria` (o grant só deixa alterar `excluido_em`) |
+| `otcb_carimbos` | `otcb_carimbos_le_proprios`, `otcb_carimbos_admin_le` |
+| `otcb_opinioes` | `otcb_opinioes_le_publicadas`, `otcb_opinioes_le_proprias`, `otcb_opinioes_admin_tudo`, `otcb_opinioes_apaga_propria` |
+| `otcb_denuncias` | `otcb_denuncias_insere_propria` (em nome próprio e nunca sobre a própria opinião), `otcb_denuncias_admin_le` |
+| `otcb_mensagens` | `otcb_mensagens_le_proprias`, `otcb_mensagens_apaga_proprias`. O admin não lê mensagens. |
+| `otcb_jogos` | `otcb_jogos_le` |
+| `otcb_execucoes_garimpo` | `otcb_execucoes_admin_le` |
+| `storage.objects` | `otcb_fotos_storage_le_proprias` (pasta `{uid}/` no bucket `otcb-fotos`) |
+
+**Grants do cliente.** Ninguém escreve evidências, fotos, carimbos, mensagens, jogos ou execuções direto; isso só acontece pelas RPCs, pelos triggers ou pelo serviço. O que o cliente pode fazer:
+- perfis: update só em `apelido`, `time_do_coracao` e `papel`, este último controlado pelo trigger;
+- fotos: update só em `excluido_em`;
+- opiniões: update só em `status` e `motivo_ocultacao`, liberado pelo RLS apenas para o admin.
+
+### Jobs do `pg_cron` (horários em UTC; São Paulo é UTC−3)
+
+| Job | Quando | Chama |
+|---|---|---|
+| `otcb_cron_recalculo` | 06:00 UTC (03:00 SP) | `otcb_recalcular_todos()` |
+| `otcb_cron_limpeza` | 06:30 UTC (03:30 SP) | `otcb_limpeza_diaria()` |
+
+Os jobs que chamam Edge Functions (revisita, coordenadas, resumos, jogos e descoberta) entram no épico 8.3.
 
 ## 4. Mapa tela → tabelas e funções
 
@@ -72,61 +176,70 @@ Cada usuário anônimo tem no máximo um perfil. O perfil só nasce depois da co
 | T10 Bloqueio | `app/(onboarding)/bloqueio.tsx` | — | — |
 | T5 Chat (provisório) | `app/chat.tsx` | — | — (épico 8.4) |
 
-## 5. Lógica por tela e por Edge Function
+## 5. Lógica por tela, Edge Function e script
 
 ### Abertura (`resolveBootState`)
-1. Na primeira abertura da instalação, descarta qualquer sessão herdada (`install-marker.ts`).
-   - O motivo: no iOS, o Keychain (onde o `expo-secure-store` guarda a sessão) sobrevive à desinstalação. O AsyncStorage não sobrevive e guarda a marca `otcb_instalacao`.
-   - Sem essa marca, o app faz `signOut({ scope: 'local' })` e apaga a marca de perfil. Assim, reinstalar começa do zero, como manda a seção 6.
-2. Garante a sessão anônima (`ensureAnonymousSession`). A função é single-flight: chamadas simultâneas compartilham a mesma promessa e criam um único usuário.
-3. Procura o perfil do uid:
-   - com perfil, vai ao Chat;
-   - sem perfil, vai à Boas-vindas.
+1. Na primeira abertura da instalação, descarta a sessão herdada (`install-marker.ts`).
+   - O Keychain do iOS sobrevive à desinstalação; o AsyncStorage não. A marca `otcb_instalacao` fica no AsyncStorage.
+   - Sem a marca, o app faz `signOut` local e apaga a marca de perfil.
+2. Garante a sessão anônima com `ensureAnonymousSession`. A função é single-flight, então cria um único usuário mesmo com chamadas simultâneas.
+3. Com perfil, vai ao Chat; sem perfil, vai à Boas-vindas.
 4. Sem rede:
    - se este aparelho já criou o perfil desse uid (marca `otcb_perfil_criado` no SecureStore), vai ao Chat (seção 17);
-   - senão, mostra a copy 15.9 de primeira abertura com "Tentar de novo".
+   - senão, mostra a copy 15.9 com "Tentar de novo".
 
 ### T2 Maioridade
-- A data é digitada em DD/MM/AAAA, com máscara. Ela vive só no estado da tela: nunca é enviada, gravada nem logada.
-- A idade civil é calculada no "hoje" de `America/Sao_Paulo` (regra 11.12). Quem nasceu em 29/02 faz anos em 01/03 nos anos não bissextos.
-- 18 anos ou mais: vai à T3 levando só o instante da confirmação.
-- Menor de idade:
-  - chama `otcb-apagar-conta`;
-  - faz `signOut` local, mesmo se a chamada falhar;
-  - mostra a T10.
+- A data é digitada em DD/MM/AAAA e fica só no estado da tela.
+- A idade civil é calculada no "hoje" de São Paulo. Quem nasceu em 29/02 faz anos em 01/03 nos anos não bissextos.
+- 18+ vai à T3 levando só o instante da confirmação.
+- Menor de idade: chama `otcb-apagar-conta`, faz `signOut` local (mesmo se a chamada falhar) e mostra a T10.
 - Data inválida ou futura: erro inline.
 
 ### T3 Apelido
-- Valida o formato no app, depois faz `insert` em `otcb_perfis`.
-- O erro 23505 vira "Esse apelido já está em uso"; o 23514 vira o erro de formato. Outros erros mostram a copy de sem rede.
-- No sucesso: grava a marca de perfil e chama `track('otcb_primeiro_acesso')`. Essa chamada ainda não faz nada, porque depende da pergunta 25.2. Depois vai à T4.
+- Valida o formato no app e faz `insert`.
+- O erro 23505 vira "Esse apelido já está em uso"; o 23514 vira o erro de formato.
+- No sucesso: grava a marca de perfil e chama `track('otcb_primeiro_acesso')`, que ainda não faz nada porque depende da 25.2. Depois vai à T4.
 
 ### T4 Localização
-"Permitir" pede a permissão em primeiro plano. Tanto "Permitir" (concedida ou negada) quanto "Agora não" levam ao Chat.
+"Permitir" pede a permissão em primeiro plano. Concedida, negada ou "Agora não", o destino é sempre o Chat.
 
 ### Edge Function `otcb-apagar-conta` (13.8)
-- `POST`, sem corpo. O id do usuário vem só do JWT, validado com `auth.getUser`.
-- No app, `deleteAccountAndSignOut` também trata o `error` que o supabase-js devolve (em vez de lançar) e limpa a sessão local mesmo se a exclusão falhar.
-- Hoje ela apaga `otcb_perfis` e depois o usuário em `auth.users`, com o service role.
-- Ainda faltam dois passos da 13.8, que entram com a tabela ou o bucket correspondente: arquivos do bucket (8.6) e anonimização de evidências (8.2).
-- Respostas:
+- `POST`, sem corpo. O id do usuário vem só do JWT.
+- Ordem: arquivos de `{uid}/` no bucket, depois `usuario_id = null` nas evidências, depois o perfil (com as filhas em cascata), por fim o usuário em `auth.users`.
+- Respostas: 200 `{ok: true}`; 401 sem JWT válido; 405 fora de POST; 500 `{error: 'falha_exclusao'}`, sem dado pessoal no log.
+- No app, `deleteAccountAndSignOut` também trata o `error` que o supabase-js devolve em vez de lançar.
 
-| Código | Quando |
-|---|---|
-| 200 `{ ok: true }` | Exclusão feita. |
-| 401 | Sem JWT válido. |
-| 405 | Método diferente de POST. |
-| 500 `{ error: 'falha_exclusao' }` | Falha na exclusão. O log não registra nenhum dado pessoal. |
+### Script `scripts/import-seed.ts` (14.1)
+- Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
+1. Lê `supabase/seed/estabelecimentos_otcb_antigo.csv`, ignorando linhas sem nome.
+2. Para cada linha, faz uma Text Search na Places API (New) com `"{Nome} {Endereço} São Paulo"`.
+3. Sem resultado ou com `CLOSED_PERMANENTLY`, a linha vai para o relatório e não é importada.
+4. Duplicados por `place_id` viram 1 bar. O bairro do Google vale quando existe.
+5. Cada bar importado ganha uma evidência `seed_otcb_antigo`.
+6. É idempotente: rodar de novo pula os `place_id` que já existem.
+- **Resultado em 08/11/2026:**
+  - 36 linhas lidas, 1 sem nome;
+  - 33 bares importados, 2 duplicados (Belmonte), nenhum sem correspondência, nenhum fechado;
+  - todos `incerto` com pontuação 0,2;
+  - a segunda execução importou 0 (33 já existentes).
 
 ## 6. Divergências em relação ao spec
 
 | Item | O que mudou | Motivo |
 |---|---|---|
-| `otcb_perfis` criada no 8.1 | O spec lista a tabela no 8.2. | O onboarding do 8.1 grava o perfil; o resto do banco continua no 8.2 (plano 8.1). |
-| Política `otcb_perfis_insere_proprio` | Exige também `papel = 'usuario'`. | O trigger de papel só cobre update. Sem isso, alguém poderia se inserir como admin. |
-| Update por coluna em `otcb_perfis` | O cliente só altera `apelido`, `time_do_coracao` e `papel` (este controlado pelo trigger). | O verifier apontou que o cliente podia reescrever `maioridade_confirmada_em`. A edição do perfil no 8.10 é só apelido e time. |
-| Marca de instalação no AsyncStorage | Mecanismo novo, não previsto no spec. | O Keychain do iOS sobrevive à desinstalação e quebrava "reinstalar = começar do zero" (seção 6, critério 4 do 8.1). Bug reproduzido no simulador e coberto por teste. |
-| Marca de perfil no SecureStore | Mecanismo novo. | Reabrir sem rede precisa ir ao Chat (seção 17) sem consultar o banco. |
-| Microtextos fora da seção 15 | Estão em `src/lib/copy.ts`, marcados como "(design)" ou "(proposto 8.1)". | O spec não traz texto para rótulos e erros de formato. Aguardam revisão do Alexandre. |
-| Advisors de `otcb_` | Ficaram três avisos aceitos: `otcb_e_admin()` executável por `authenticated`, políticas que valem para o usuário anônimo e duas políticas permissivas de select. | Os três vêm direto do spec: as políticas de admin usam a função, a identidade do app é anônima e os dois nomes de política estão na 6.1. |
-| Mascote | Ilustrações geradas no Higgsfield (`assets/images/bolacha-*.png`, `azulejo.png`). No modo escuro a Bolacha ganha um halo claro. | Os traços cor de tinta sumiriam no fundo escuro (16.5). |
+| `otcb_perfis` criada no 8.1 | O spec lista a tabela no 8.2. | O onboarding do 8.1 grava o perfil. |
+| `otcb_perfis_insere_proprio` | Exige `papel = 'usuario'`. | O trigger de papel só cobre update. |
+| Update por coluna em perfis, fotos e opiniões | Grants por coluna. | O cliente não reescreve maioridade, notas ou contadores. |
+| Marca de instalação (AsyncStorage) e marca de perfil (SecureStore) | Mecanismos novos. | Reinstalar precisa começar do zero no iOS; reabrir sem rede precisa ir ao Chat. |
+| Trigger `otcb_trg_evidencia_define_peso` e função `otcb_regra_evidencia` | Não estão na 7.5. | A 11.1 manda copiar peso e meia-vida no insert sem dizer como; a 24.11 pede pesos ajustáveis num só lugar. |
+| `otcb_trg_foto_processa` também roda no update de `excluido_em` | A 7.5 fala só em insert. | A média da 11.5 é sobre fotos não excluídas. |
+| `otcb_meu_passaporte` como security definer | A 7.5 diz invoker. | O selo Informante lê as próprias evidências, que o RLS reserva ao admin; o filtro é `auth.uid()`. |
+| `otcb_agregados_confirmacao` e `otcb_bar_mais_proximo` | Funções novas. | Agregados do `CardBar` sem expor evidências (5.2); a regra 11.4 aplicada no banco para a Edge Function do 8.6. |
+| `otcb_sugerir_bar` | Bar novo com `tem_brahma = false` gera `dados_invalidos`; sugestão que casa vira confirmação. | A copy 15.18 diz "sua confirmação foi registrada"; sem Brahma não há o que cadastrar. Assim o limite de 5 por dia conta as evidências `sugestao_usuario`. |
+| `otcb_detalhes_bar` | Devolve o status real (pode ser `sem_brahma` ou `fechado`). | A assinatura não traz contexto; o agente só mostra os visíveis da 11.9. |
+| Fechamento pelo Google | Interpretação literal: um `status_google` fechado só é anulado por foto ou confirmação positiva de usuário mais recente. | O spec não trata o Google voltar a dizer OPERATIONAL; ponto registrado no plano 8.2. |
+| CHECK `otcb_fotos_caminho_do_dono` | Restrição a mais. | Garante a pasta `{usuario_id}/` exigida pela 7.2 e pela política de storage. |
+| Advisors de `otcb_` | Avisos aceitos, nenhum ERROR: RPCs `security definer` executáveis por `authenticated` (a 13.4 exige), políticas acessíveis ao usuário anônimo (a identidade do app é anônima), políticas permissivas múltiplas (nomes da 6.1) e índices ainda sem uso. | Todos vêm do próprio spec. |
+| Microtextos fora da seção 15 | Em `src/lib/copy.ts`, aprovados pelo Alexandre em 07/11/2026. | O spec não traz texto para rótulos e erros de formato. |
+| Mascote | Ilustrações do Higgsfield; no modo escuro a Bolacha ganha um halo claro. | Os traços cor de tinta sumiriam no fundo escuro (16.5). |
+| **Pendente para o 8.4/8.8** | O apelido dos outros usuários nas opiniões é público (seção 20), mas o RLS de perfis só deixa ver o próprio. | Vai precisar de uma função ou view nesses épicos. |

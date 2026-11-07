@@ -15,7 +15,23 @@ Deno.serve((req) =>
       const { data, error } = await admin.auth.getUser(token);
       return error || !data.user ? null : data.user.id;
     },
-    // Apaga o perfil (seção 7.4: hard delete).
+    // Lista e remove os arquivos da pasta do usuário no bucket (o caminho é sempre {userId}/..., 7.2).
+    async deleteStorageFolder(userId) {
+      const bucket = admin.storage.from("otcb-fotos");
+      for (;;) {
+        const { data, error } = await bucket.list(userId, { limit: 100 });
+        if (error) throw error;
+        if (!data || data.length === 0) return;
+        const { error: removeError } = await bucket.remove(data.map((file) => `${userId}/${file.name}`));
+        if (removeError) throw removeError;
+      }
+    },
+    // Desvincula as evidências do usuário (seção 7.4).
+    async anonymizeEvidence(userId) {
+      const { error } = await admin.from("otcb_evidencias").update({ usuario_id: null }).eq("usuario_id", userId);
+      if (error) throw error;
+    },
+    // Apaga o perfil (seção 7.4: hard delete; as tabelas filhas caem em cascata).
     async deleteProfile(userId) {
       const { error } = await admin.from("otcb_perfis").delete().eq("id", userId);
       if (error) throw error;

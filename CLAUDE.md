@@ -31,7 +31,10 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - Supabase local usa as portas **563xx** (API 56321, DB 56322, Studio 56323, Mailpit 56324); 543xx/553xx/554xx são de outros projetos.
 - "Brahma" nunca entra em `store/`, `app.json`, `app.config.ts`, `eas.json` (hook `guard-store-brand`). Dentro do app, só como descrição factual.
 - Colarinhômetro: nunca galeria, só câmera do app (regra 11.4, hook `guard-gallery`).
-- Status do bar nunca é escrito à mão: só `otcb_recalcular_bar` (regras 11.1–11.2).
+- Status do bar nunca é escrito à mão: só `otcb_recalcular_bar` (regras 11.1–11.2). Peso/meia-vida vêm de `otcb_regra_evidencia` (trigger sobrescreve o que o chamador mandar).
+- Evidência de usuário só via RPC (`otcb_confirmar_bar`/`otcb_sugerir_bar`) ou trigger de foto; cliente não tem grant de insert. Limites diários usam o dia de SP (`otcb_hoje_sp`).
+- Semente: `npm run seed:import` (lê `.env` + `.env.local`; idempotente). `.env.local` tem segredos e nunca é exibido.
+- pg_cron roda em UTC (SP = UTC−3).
 - O agente de IA não grava nada no banco; toda escrita do usuário passa por card (8.5, 13.3).
 - Nenhuma mecânica conta quantidade de chopp (princípio 3).
 - Segredos só em `supabase/functions/` e `scripts/` (hook `guard-secrets`); o app só tem `EXPO_PUBLIC_*`.

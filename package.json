@@ -29,10 +29,12 @@
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
+    "csv-parse": "^7.0.3",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
     "jest": "^30.5.2",
     "jest-expo": "^58.0.14",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -44,7 +46,8 @@
     "test": "jest",
     "test:db": "supabase test db",
     "test:functions": "deno test supabase/functions",
-    "build:check": "expo export --platform all --output-dir dist"
+    "build:check": "expo export --platform all --output-dir dist",
+    "seed:import": "tsx --env-file=.env --env-file=.env.local scripts/import-seed.ts"
   },
   "private": true,
   "jest": {

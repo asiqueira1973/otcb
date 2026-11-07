@@ -7,6 +7,14 @@ function fakeDeps(validToken = "token-a", userId = "uid-a") {
   const calls: string[] = [];
   const deps: DeleteAccountDeps = {
     getUserIdFromToken: (token) => Promise.resolve(token === validToken ? userId : null),
+    deleteStorageFolder: (id) => {
+      calls.push(`storage:${id}`);
+      return Promise.resolve();
+    },
+    anonymizeEvidence: (id) => {
+      calls.push(`evidencias:${id}`);
+      return Promise.resolve();
+    },
     deleteProfile: (id) => {
       calls.push(`perfil:${id}`);
       return Promise.resolve();
@@ -37,12 +45,12 @@ Deno.test("JWT inválido devolve 401", async () => {
   assertEquals(calls, []);
 });
 
-Deno.test("apaga perfil e depois auth.users, na ordem da 13.8, e devolve { ok: true }", async () => {
+Deno.test("ordem da 13.8: bucket → evidências → perfil → auth.users, e devolve { ok: true }", async () => {
   const { deps, calls } = fakeDeps();
   const res = await handleDeleteAccount(post({ Authorization: "Bearer token-a" }), deps);
   assertEquals(res.status, 200);
   assertEquals(await res.json(), { ok: true });
-  assertEquals(calls, ["perfil:uid-a", "auth:uid-a"]);
+  assertEquals(calls, ["storage:uid-a", "evidencias:uid-a", "perfil:uid-a", "auth:uid-a"]);
 });
 
 Deno.test("usa o id do token mesmo que o corpo traga outro", async () => {
@@ -52,7 +60,7 @@ Deno.test("usa o id do token mesmo que o corpo traga outro", async () => {
     deps,
   );
   assertEquals(res.status, 200);
-  assertEquals(calls, ["perfil:uid-a", "auth:uid-a"]);
+  assertEquals(calls, ["storage:uid-a", "evidencias:uid-a", "perfil:uid-a", "auth:uid-a"]);
 });
 
 Deno.test("falha no meio devolve 500 genérico", async () => {
@@ -61,6 +69,14 @@ Deno.test("falha no meio devolve 500 genérico", async () => {
   const res = await handleDeleteAccount(post({ Authorization: "Bearer token-a" }), deps);
   assertEquals(res.status, 500);
   assertEquals(await res.json(), { error: "falha_exclusao" });
+});
+
+Deno.test("falha ao limpar o bucket interrompe antes de apagar o perfil", async () => {
+  const { deps, calls } = fakeDeps();
+  deps.deleteStorageFolder = () => Promise.reject(new Error("storage"));
+  const res = await handleDeleteAccount(post({ Authorization: "Bearer token-a" }), deps);
+  assertEquals(res.status, 500);
+  assertEquals(calls, []);
 });
 
 Deno.test("método diferente de POST devolve 405", async () => {
