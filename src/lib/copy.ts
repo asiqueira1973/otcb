@@ -1,5 +1,5 @@
 // Textos da interface (spec seção 15: textos finais, não placeholders). Nenhum texto de tela fora daqui.
-// Entradas marcadas "(design)" vêm do prompt-design-otcb.md; "(proposto 8.1)" estão no plano 8.1 para revisão.
+// Entradas marcadas "(design)" vêm do prompt-design-otcb.md; "(aprovado 8.1)" estão no plano 8.1 para revisão.
 
 export const copy = {
   // 15.10: nome do produto (sem a marca de cerveja)
@@ -13,22 +13,22 @@ export const copy = {
     start: 'Bora começar',
   },
   age: {
-    // (proposto 8.1) reaproveita a 15.11b
+    // (aprovado 8.1) reaproveita a 15.11b
     explain: 'O OTCB é só para maiores de 18 anos.',
-    question: 'Quando você nasceu?', // (proposto 8.1)
-    fieldLabel: 'Data de nascimento', // (proposto 8.1)
+    question: 'Quando você nasceu?', // (aprovado 8.1)
+    fieldLabel: 'Data de nascimento', // (aprovado 8.1)
     placeholder: 'DD/MM/AAAA',
     confirm: 'Confirmar', // (design)
-    invalidDate: 'Confere a data: dia/mês/ano.', // (proposto 8.1)
+    invalidDate: 'Confere a data: dia/mês/ano.', // (aprovado 8.1)
   },
   // 15.2
   blocked: 'Aqui é só pra maiores de 18. Volta daqui a pouco, que o chopp espera.',
   nickname: {
-    title: 'Como a galera vai te chamar?', // (proposto 8.1)
+    title: 'Como a galera vai te chamar?', // (aprovado 8.1)
     label: 'Apelido', // (design)
-    hint: 'Aparece nas suas opiniões.', // (proposto 8.1)
+    hint: 'Aparece nas suas opiniões.', // (aprovado 8.1)
     teamLabel: 'Time do coração (opcional)', // (design)
-    formatError: 'Use de 3 a 20 letras, números, ponto ou sublinhado.', // (proposto 8.1)
+    formatError: 'Use de 3 a 20 letras, números, ponto ou sublinhado.', // (aprovado 8.1)
     takenError: 'Esse apelido já está em uso', // (design)
     // 15.14
     submit: 'Bora',
