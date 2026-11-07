@@ -37,7 +37,10 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - Segredos só em `supabase/functions/` e `scripts/` (hook `guard-secrets`); o app só tem `EXPO_PUBLIC_*`.
 - Data de nascimento nunca é gravada nem logada; localização e texto do chat fora de log e telemetria (seção 20).
 - Expo muda a cada SDK: antes de usar API do Expo/RN, ler a doc da versão 58 (`docs.expo.dev/versions/v58.0.0/`); instalar pacote com `npx expo install`.
-- RNTL 14: `render` é assíncrono (`await render(...)`).
+- RNTL 14: `render` **e** `fireEvent` são assíncronos (`await` nos dois). Reanimated 4 no jest: mock mínimo em `jest.setup.ts` (o oficial exige o runtime do Worklets).
+- iOS: o Keychain (`expo-secure-store`) sobrevive à desinstalação; "reinstalar = começar do zero" depende da marca `otcb_instalacao` no AsyncStorage (`install-marker.ts`). Não remova.
+- Textos de tela só em `src/lib/copy.ts`; microtexto fora da seção 15 leva a marca "(proposto 8.X)" até o Alexandre aprovar.
+- Testes no simulador: Expo Go via `npx expo start --ios --port 8091`; apague os usuários anônimos de teste do remoto no fim.
 - `tsconfig.json` exclui `supabase/functions` (Deno tem `supabase/functions/deno.json` próprio).
 - Testes de banco nunca contam a tabela inteira: filtre pelos dados da fixture.
 - Hooks de `.claude/settings.json` só valem em sessão do Claude Code aberta nesta pasta.

@@ -1,8 +1,31 @@
+import { Baloo2_800ExtraBold } from '@expo-google-fonts/baloo-2';
+import { Nunito_600SemiBold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Layout raiz do Expo Router: pilha de telas sem cabeçalho.
-// Recebe: nada. Devolve: a navegação em pilha das rotas de app/.
-// Implementa a seção 18 (rotas do Expo Router em app/); telas T1–T10 entram a partir do épico 8.1.
+import { useTheme } from '../src/components/theme';
+
+// Layout raiz: carrega as fontes da seção 16.3 e monta a pilha de telas sem cabeçalho.
+// Recebe: nada. Devolve: a navegação; o roteamento inicial (sessão/perfil) fica em app/index.tsx.
 export default function RootLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  const theme = useTheme();
+  const [fontsLoaded] = useFonts({ Baloo2_800ExtraBold, Nunito_600SemiBold, Nunito_800ExtraBold });
+
+  if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
+
+  return (
+    <SafeAreaProvider>
+      <StatusBar style={theme.dark ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          gestureEnabled: false,
+          contentStyle: { backgroundColor: theme.background },
+        }}
+      />
+    </SafeAreaProvider>
+  );
 }
