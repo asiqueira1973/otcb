@@ -1,0 +1,15 @@
+{
+  "id": "ChIJ_bar_da_esquina",
+  "reviews": [
+    {
+      "name": "places/ChIJ_bar_da_esquina/reviews/r1",
+      "originalText": { "text": "Chopp Brahma bem tirado, colarinho perfeito. Passam todos os jogos do Corinthians." },
+      "publishTime": "2026-10-01T20:00:00Z"
+    },
+    {
+      "name": "places/ChIJ_bar_da_esquina/reviews/r2",
+      "originalText": { "text": "Atendimento demorado." },
+      "publishTime": "2026-09-15T20:00:00Z"
+    }
+  ]
+}

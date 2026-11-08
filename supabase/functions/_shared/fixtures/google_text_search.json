@@ -1,0 +1,23 @@
+{
+  "places": [
+    {
+      "id": "ChIJ_bar_da_esquina",
+      "displayName": { "text": "Bar da Esquina" },
+      "formattedAddress": "R. dos Pinheiros, 100 - Pinheiros, São Paulo - SP",
+      "location": { "latitude": -23.5650, "longitude": -46.6830 },
+      "businessStatus": "OPERATIONAL",
+      "addressComponents": [
+        { "longText": "Pinheiros", "types": ["sublocality_level_1", "sublocality", "political"] },
+        { "longText": "São Paulo", "types": ["locality", "political"] }
+      ]
+    },
+    {
+      "id": "ChIJ_bar_fechado",
+      "displayName": { "text": "Bar Fechado" },
+      "formattedAddress": "R. Teste, 1 - Pinheiros, São Paulo - SP",
+      "location": { "latitude": -23.5660, "longitude": -46.6840 },
+      "businessStatus": "CLOSED_PERMANENTLY",
+      "addressComponents": []
+    }
+  ]
+}

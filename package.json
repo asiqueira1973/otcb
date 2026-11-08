@@ -45,9 +45,10 @@
     "lint": "expo lint",
     "test": "jest",
     "test:db": "supabase test db",
-    "test:functions": "deno test supabase/functions",
+    "test:functions": "deno test --config supabase/functions/deno.json --allow-read supabase/functions",
     "build:check": "expo export --platform all --output-dir dist",
-    "seed:import": "tsx --env-file=.env --env-file=.env.local scripts/import-seed.ts"
+    "seed:import": "tsx --env-file=.env --env-file=.env.local scripts/import-seed.ts",
+    "garimpo:configurar": "tsx --env-file=.env --env-file=.env.local scripts/configurar-garimpo.ts"
   },
   "private": true,
   "jest": {
