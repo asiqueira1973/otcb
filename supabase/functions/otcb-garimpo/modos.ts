@@ -1,6 +1,8 @@
 import { dataDaEvidencia, type EvidenciaProposta, evidenciasDaClassificacao, tipoDaPagina } from "./classificacao.ts";
 import type { BarCoordenadas, BarResumo, BarRevisita, Candidato, Contexto, Modo, Posicao } from "./tipos.ts";
+import { ExternalServiceError } from "../_shared/errors.ts";
 import type { GooglePlace } from "../_shared/google.ts";
+import { TetoAtingido } from "./orcamento.ts";
 
 // Os quatro modos do garimpo (épico 8.3). Cada modo seleciona itens a partir da posição salva no cursor,
 // processa um item por vez e diz quando acabou. Falha de um item é tratada pelo executor (critério 5).
@@ -95,15 +97,33 @@ export const resumos: ModoGarimpo<BarResumo> = {
 // Regra 11.15: para cada bairro, Google Text Search e Firecrawl search geram candidatos. Lugar do Google →
 // avaliações classificadas (avaliacao_google). Página → classificação, localização no Google pelo nome e
 // evidência pagina_web/cardapio_site. Bar novo só nasce com evidência positiva de Brahma (11.16).
+// Erros que precisam parar a execução (teto da 11.17 ou credencial inválida, 12.3); o resto é do item.
+function deveParar(error: unknown): boolean {
+  return error instanceof TetoAtingido || (error instanceof ExternalServiceError && error.fatal);
+}
+
+// Gera a fila de candidatos de um bairro (regra 11.15). Cada busca é isolada: se o Google ou o Firecrawl
+// falhar, o erro vai para `erros` e o que a outra busca trouxe é aproveitado (critério 5 do 8.3; 12.5).
+// Recebe: contexto e bairro. Devolve: candidatos (lugares não fechados e páginas).
 async function gerarFila(ctx: Contexto, bairro: string): Promise<Candidato[]> {
-  ctx.orcamento.consumir("text_search");
-  const lugares = await ctx.google.searchText(`bar chopp Brahma ${bairro} São Paulo`, 10);
-  ctx.orcamento.consumir("firecrawl", 5);
-  const paginas = await ctx.firecrawl.search(`chopp Brahma bar ${bairro} São Paulo`, 5);
-  return [
-    ...lugares.filter((l) => l.businessStatus !== "CLOSED_PERMANENTLY").map((lugar) => ({ tipo: "lugar" as const, bairro, lugar })),
-    ...paginas.map((p) => ({ tipo: "pagina" as const, bairro, url: p.url, titulo: p.titulo })),
-  ];
+  const fila: Candidato[] = [];
+  try {
+    ctx.orcamento.consumir("text_search");
+    const lugares = await ctx.google.searchText(`bar chopp Brahma ${bairro} São Paulo`, 10);
+    for (const lugar of lugares) if (lugar.businessStatus !== "CLOSED_PERMANENTLY") fila.push({ tipo: "lugar", bairro, lugar });
+  } catch (error) {
+    if (deveParar(error)) throw error;
+    ctx.registrarErro({ etapa: `busca:${bairro}:google`, erro: error });
+  }
+  try {
+    ctx.orcamento.consumir("firecrawl", 5);
+    const paginas = await ctx.firecrawl.search(`chopp Brahma bar ${bairro} São Paulo`, 5);
+    for (const p of paginas) fila.push({ tipo: "pagina", bairro, url: p.url, titulo: p.titulo });
+  } catch (error) {
+    if (deveParar(error)) throw error;
+    ctx.registrarErro({ etapa: `busca:${bairro}:firecrawl`, erro: error });
+  }
+  return fila;
 }
 
 async function gravarNoBar(ctx: Contexto, lugar: GooglePlace, bairro: string, evidencias: { e: EvidenciaProposta; url: string }[]) {
@@ -123,7 +143,8 @@ export const descoberta: ModoGarimpo<Candidato> = {
     pos.bairroIdx ??= 0;
     pos.fila ??= [];
     while (pos.fila.length === 0 && pos.bairroIdx < ctx.bairros.length) {
-      pos.fila = await gerarFila(ctx, ctx.bairros[pos.bairroIdx]);
+      const bairro = ctx.bairros[pos.bairroIdx];
+      pos.fila = await gerarFila(ctx, bairro);
       pos.bairroIdx += 1;
     }
     return pos.fila.slice(0, n);

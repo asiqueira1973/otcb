@@ -61,4 +61,6 @@ export type Contexto = {
   agora: Date;
   bairros: string[];
   contadores: { bares_novos: number; evidencias_criadas: number };
+  // Registra uma falha que não é de item (ex.: busca de um bairro) em `erros`, já sanitizada (12.5).
+  registrarErro: (info: { etapa: string; erro: unknown }) => void;
 };

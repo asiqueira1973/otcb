@@ -46,16 +46,20 @@ export function neighborhoodOf(components: { longText?: string; types?: string[]
 }
 
 // Cria o cliente com a chave do ambiente da função. Recebe: chave e fetch (injetável). Devolve: GoogleClient.
-// Erros HTTP viram ExternalServiceError sem a chave na mensagem; 401/402/403 são fatais.
+// Erros HTTP viram ExternalServiceError sem a chave na mensagem; 401/402/403 e 400 API_KEY_INVALID são
+// fatais (12.3). Cada chamada tem timeout de 30 s.
 export function createGoogleClient(apiKey: string, fetchFn: Fetch = fetch): GoogleClient {
   async function call(url: string, init: RequestInit, fieldMask: string): Promise<RawPlace & { places?: RawPlace[] }> {
     const res = await fetchFn(url, {
       ...init,
       headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fieldMask },
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) {
-      await res.body?.cancel();
-      throw new ExternalServiceError("google", res.status, isFatalStatus(res.status), "places");
+      // O Google responde 400 (não 401/403) para chave inválida: o motivo vem em error.details[].reason.
+      const corpo = await res.text().catch(() => "");
+      const chaveInvalida = res.status === 400 && /API_KEY_INVALID|API_KEY_EXPIRED/.test(corpo);
+      throw new ExternalServiceError("google", res.status, isFatalStatus(res.status) || chaveInvalida, "places");
     }
     return await res.json();
   }

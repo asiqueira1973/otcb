@@ -84,7 +84,7 @@ function traduzirErro(error: unknown): never {
 
 // Cria o cliente. Recebe: chave da API. Devolve: ClaudeClient.
 export function createClaudeClient(apiKey: string): ClaudeClient {
-  const client = new Anthropic({ apiKey, maxRetries: 2 });
+  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 });
 
   function textoDe(response: Anthropic.Message): string {
     return response.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("").trim();

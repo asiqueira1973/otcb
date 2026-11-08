@@ -41,35 +41,48 @@ export async function executarLote(execucaoId: string, modo: Modo, s: Servicos, 
     db: s.db, google: s.google, firecrawl: s.firecrawl, claude: s.claude, orcamento,
     agora: new Date(inicio), bairros: cursor.bairros ?? BAIRROS_DESCOBERTA,
     contadores: { bares_novos: 0, evidencias_criadas: 0 },
+    registrarErro: () => {},
   };
   const m = MODOS_GARIMPO[modo];
   const novosErros: Record<string, unknown>[] = [];
+  ctx.registrarErro = ({ etapa, erro }) => novosErros.push({ etapa, erro: errorMessage(erro, s.segredos) });
   let processados = 0;
-  let selecionados: unknown[] = [];
   let teto: TetoAtingido | null = null;
   let fatal: string | null = null;
   let pausou = false;
+  let fim = false;
 
-  try {
-    selecionados = await m.selecionar(ctx, pos, ITENS_POR_INVOCACAO);
-  } catch (error) {
-    if (error instanceof TetoAtingido) teto = error;
-    else if (error instanceof ExternalServiceError && error.fatal) fatal = errorMessage(error, s.segredos);
-    else novosErros.push({ etapa: "selecao", erro: errorMessage(error, s.segredos) });
-  }
-
-  for (const item of selecionados) {
-    if (teto || fatal) break;
-    if (agora() - inicio > TEMPO_MAXIMO_MS) { pausou = true; break; }
+  // Seleciona e processa em rodadas até ITENS_POR_INVOCACAO itens, o tempo acabar ou o modo terminar
+  // (na descoberta, uma fila pequena de um bairro não encerra a invocação: segue para o próximo bairro).
+  while (!teto && !fatal && !pausou && !fim && processados < ITENS_POR_INVOCACAO) {
+    const pedidos = ITENS_POR_INVOCACAO - processados;
+    let selecionados: unknown[] = [];
     try {
-      await m.processar(ctx, item);
+      selecionados = await m.selecionar(ctx, pos, pedidos);
     } catch (error) {
       if (error instanceof TetoAtingido) { teto = error; break; }
       if (error instanceof ExternalServiceError && error.fatal) { fatal = errorMessage(error, s.segredos); break; }
-      novosErros.push({ item: m.rotulo(item), erro: errorMessage(error, s.segredos) });
+      // Falha na seleção (ex.: banco): registra e encerra, em vez de reagendar sem fim (12.5).
+      novosErros.push({ etapa: "selecao", erro: errorMessage(error, s.segredos) });
+      fim = true;
+      break;
     }
-    m.marcarFeito(pos, item);
-    processados += 1;
+    if (selecionados.length === 0) { fim = true; break; }
+
+    let rodadaCompleta = true;
+    for (const item of selecionados) {
+      if (agora() - inicio > TEMPO_MAXIMO_MS) { pausou = true; rodadaCompleta = false; break; }
+      try {
+        await m.processar(ctx, item);
+      } catch (error) {
+        if (error instanceof TetoAtingido) { teto = error; rodadaCompleta = false; break; }
+        if (error instanceof ExternalServiceError && error.fatal) { fatal = errorMessage(error, s.segredos); rodadaCompleta = false; break; }
+        novosErros.push({ item: m.rotulo(item), erro: errorMessage(error, s.segredos) });
+      }
+      m.marcarFeito(pos, item);
+      processados += 1;
+    }
+    if (rodadaCompleta && m.acabou(ctx, pos, selecionados.length, pedidos)) fim = true;
   }
 
   let status: ResultadoLote["status"];
@@ -82,7 +95,7 @@ export async function executarLote(execucaoId: string, modo: Modo, s: Servicos, 
     status = "concluida";
     motivo = teto.message;
     novosErros.push({ motivo: "teto_atingido", recurso: teto.recurso, escopo: teto.escopo });
-  } else if (!pausou && processados === selecionados.length && m.acabou(ctx, pos, selecionados.length, ITENS_POR_INVOCACAO)) {
+  } else if (fim) {
     status = "concluida";
   } else {
     status = "em_andamento";

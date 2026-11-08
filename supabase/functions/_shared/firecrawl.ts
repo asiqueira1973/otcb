@@ -21,6 +21,7 @@ export function createFirecrawlClient(apiKey: string, fetchFn: typeof fetch = fe
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(45_000),
     });
     if (!res.ok) {
       await res.body?.cancel();
