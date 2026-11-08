@@ -82,9 +82,13 @@ function traduzirErro(error: unknown): never {
   throw error;
 }
 
-// Cria o cliente. Recebe: chave da API. Devolve: ClaudeClient.
-export function createClaudeClient(apiKey: string): ClaudeClient {
-  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 });
+// Chamada ao modelo (injetável nos testes, seção 22).
+export type CriarMensagem = (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
+
+// Cria o cliente. Recebe: chave da API e, nos testes, a chamada simulada. Devolve: ClaudeClient.
+export function createClaudeClient(apiKey: string, criar?: CriarMensagem): ClaudeClient {
+  const sdk = criar ? null : new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 });
+  const client = { messages: { create: criar ?? ((p: Anthropic.MessageCreateParamsNonStreaming) => sdk!.messages.create(p)) } };
 
   function textoDe(response: Anthropic.Message): string {
     return response.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("").trim();

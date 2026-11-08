@@ -101,10 +101,14 @@ export async function denunciar(opiniaoId: string, motivo: string | null): Promi
   }
 }
 
-// Opinião atual da pessoa no bar (critério 5), para o card aberto pela Ficha. Recebe: bar. Devolve: texto/nota ou null.
-export async function minhaOpiniao(barId: string): Promise<{ texto: string; nota: number | null } | null> {
+export type MinhaOpiniao = { id: string; texto: string; nota: number | null; status: string; criado_em: string };
+
+// Opinião da própria pessoa no bar, de qualquer status (6.1 otcb_opinioes_le_proprias): preenche o card
+// (critério 5 do 8.5) e aparece na Ficha, inclusive oculta, com a 15.17 (critério 3 do 8.8).
+// Recebe: bar. Devolve: a opinião ou null.
+export async function minhaOpiniao(barId: string): Promise<MinhaOpiniao | null> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;
-  const { data } = await supabase.from('otcb_opinioes').select('texto, nota').eq('bar_id', barId).eq('usuario_id', u.user.id).maybeSingle();
-  return data ?? null;
+  const { data } = await supabase.from('otcb_opinioes').select('id, texto, nota, status, criado_em').eq('bar_id', barId).eq('usuario_id', u.user.id).maybeSingle();
+  return (data as MinhaOpiniao | null) ?? null;
 }

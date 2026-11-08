@@ -87,3 +87,18 @@ Deno.test("google: 400 com API_KEY_INVALID é fatal (chave inválida); outros 40
   const outro = await assertRejects(() => createGoogleClient("k", fakeFetch(JSON.stringify({ error: { status: "INVALID_ARGUMENT" } }), 400)).detailsBasic("x"), ExternalServiceError);
   assertEquals(outro.fatal, false);
 });
+
+// ===== 8.8, critério 4: o resumo (11.8) recebe só texto e nota — nunca apelido — e sai com até 400 caracteres.
+Deno.test("11.8: resumo não recebe apelidos e é cortado em 400 caracteres", async () => {
+  const { createClaudeClient } = await import("./claude.ts");
+  const pedidos: unknown[] = [];
+  const claude = createClaudeClient("k", (p) => {
+    pedidos.push(p);
+    return Promise.resolve({ stop_reason: "end_turn", content: [{ type: "text", text: "R".repeat(450) }] } as never);
+  });
+  const resumo = await claude.summarize([{ texto: "Chopp gelado", nota: 5 }, { texto: "Colarinho ralo", nota: null }], () => {});
+  const enviado = JSON.stringify(pedidos[0]);
+  if (!enviado.includes("Chopp gelado") || !enviado.includes("Colarinho ralo")) throw new Error("textos não enviados");
+  if (!/Não cite nomes nem apelidos/.test(enviado)) throw new Error("o prompt precisa proibir apelidos");
+  if (resumo.length !== 400) throw new Error(`resumo com ${resumo.length} caracteres`);
+});

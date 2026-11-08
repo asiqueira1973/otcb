@@ -7,7 +7,7 @@ import { Button } from '../../components/Button';
 import { fonts, useTheme } from '../../components/theme';
 import { copy } from '../../lib/copy';
 import { track } from '../../lib/telemetry';
-import { minhaOpiniao } from '../cards/api';
+import { minhaOpiniao, type MinhaOpiniao } from '../cards/api';
 import type { BlocoEntrada, CardBar } from '../chat/types';
 import { apelidoProprio, fetchBar, fetchOpinions, type Opiniao } from './api';
 import { barTags } from './BarCard';
@@ -66,7 +66,8 @@ type Props = { visible: boolean; bar: CardBar | null; failed: boolean; onClose: 
 
 // Ficha do bar (T6) em bottom sheet que sobe com mola (A10, ~300 ms; com "reduzir movimento", só opacidade).
 // Mostra nome, bairro, endereço, status, etiquetas, nota do colarinho, última confirmação, resumo e opiniões
-// (15.16 quando vazio), com "Como chegar" e "Chamar Uber". "Dar opinião" (já preenchido com a opinião atual,
+// (15.16 quando vazio; 10 por página com "Ver mais", 8.8; a própria opinião à parte, mesmo oculta, com a 15.17),
+// com "Como chegar" e "Chamar Uber". "Dar opinião" (já preenchido com a opinião atual,
 // critério 5), "Tem Brahma?" e "Denunciar" (menos na própria opinião) fecham a ficha e abrem o card no chat (8.5).
 // Recebe: visibilidade, bar, falha e fechar. Devolve: o modal.
 export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
@@ -75,7 +76,10 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
   // Opiniões guardadas com o id do bar: enquanto o id não bate com o aberto, a lista está carregando.
-  const [loadedOpinions, setLoadedOpinions] = useState<{ barId: string; list: Opiniao[] } | null>(null);
+  // 8.8: 10 por página ("Ver mais") e a opinião da própria pessoa à parte, de qualquer status.
+  const [loadedOpinions, setLoadedOpinions] = useState<
+    { barId: string; list: Opiniao[]; pagina: number; temMais: boolean; propria: MinhaOpiniao | null } | null
+  >(null);
 
   useEffect(() => {
     progress.value = visible
@@ -87,19 +91,30 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
   useEffect(() => {
     if (!barId) return;
     let alive = true;
-    fetchOpinions(barId)
-      .then((list) => alive && setLoadedOpinions({ barId, list }))
-      .catch(() => alive && setLoadedOpinions({ barId, list: [] }));
+    Promise.all([fetchOpinions(barId, 0).catch(() => [] as Opiniao[]), onCard ? minhaOpiniao(barId).catch(() => null) : Promise.resolve(null)])
+      .then(([list, propria]) => alive && setLoadedOpinions({ barId, list, pagina: 0, temMais: list.length === 10, propria }));
     return () => {
       alive = false;
     };
-  }, [barId]);
+  }, [barId, onCard]);
 
-  const opinions = loadedOpinions && loadedOpinions.barId === barId ? loadedOpinions.list : null;
+  const atual = loadedOpinions && loadedOpinions.barId === barId ? loadedOpinions : null;
+  const propria = atual?.propria ?? null;
+  // A própria aparece à parte (sem "Denunciar"); fora dela, a lista pública (só publicadas, otcb_opinioes_do_bar).
+  const opinions = atual ? atual.list.filter((o) => o.opiniao_id !== propria?.id) : null;
+  // Também pelo apelido (problema 5 do verifier no 8.5): nunca oferecer "Denunciar" na própria opinião.
   const [meuApelido, setMeuApelido] = useState<string | null>(null);
   useEffect(() => {
     if (onCard && visible && meuApelido === null) void apelidoProprio().then(setMeuApelido);
   }, [onCard, visible, meuApelido]);
+
+  // "Ver mais" (8.8): busca a próxima página de 10. Recebe: nada.
+  async function verMais() {
+    if (!atual || !barId) return;
+    const pagina = atual.pagina + 1;
+    const mais = await fetchOpinions(barId, pagina).catch(() => [] as Opiniao[]);
+    setLoadedOpinions({ ...atual, list: [...atual.list, ...mais], pagina, temMais: mais.length === 10 });
+  }
 
   async function darOpiniao(b: CardBar) {
     const atual = await minhaOpiniao(b.bar_id).catch(() => null);
@@ -171,9 +186,20 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
               </>
             ) : null}
             <Text accessibilityRole="header" style={[styles.section, { color: theme.text }]}>{copy.sheet.opinions}</Text>
+            {propria ? (
+              <View testID="minha-opiniao" style={[styles.opinion, { backgroundColor: theme.card, borderColor: theme.primary }]}>
+                <Text style={[styles.opinionHead, { color: theme.text }]}>
+                  {copy.sheet.yours}{propria.nota !== null ? ` · ${'★'.repeat(propria.nota)}` : ''} · {formatShortDate(propria.criado_em)}
+                </Text>
+                {propria.status !== 'publicada' ? (
+                  <Text testID="minha-opiniao-oculta" style={[styles.opinionHead, { color: theme.error }]}>{copy.sheet.yoursHidden}</Text>
+                ) : null}
+                <Text style={[styles.body, { color: theme.text, opacity: propria.status !== 'publicada' ? 0.7 : 1 }]}>{propria.texto}</Text>
+              </View>
+            ) : null}
             {opinions === null ? (
               <ActivityIndicator color={theme.primary} />
-            ) : opinions.length === 0 ? (
+            ) : opinions.length === 0 && !propria ? (
               <Text style={[styles.body, { color: theme.textMuted }]}>{copy.sheet.noOpinions}</Text>
             ) : (
               opinions.map((o) => (
@@ -197,6 +223,9 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
                 </View>
               ))
             )}
+            {atual?.temMais ? (
+              <Button testID="ficha-ver-mais" variant="ghost" label={copy.sheet.more} onPress={() => void verMais()} />
+            ) : null}
           </ScrollView>
         )}
       </Animated.View>

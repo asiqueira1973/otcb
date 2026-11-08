@@ -90,6 +90,10 @@ export const copy = {
     // 15.16
     noOpinions: 'Ninguém opinou ainda. Seja o primeiro.',
     close: 'Fechar', // (proposto 8.4)
+    more: 'Ver mais opiniões', // (proposto 8.8)
+    yours: 'Sua opinião', // (proposto 8.8)
+    // 15.17
+    yoursHidden: 'Sua opinião está oculta.',
     loadError: 'Não deu pra abrir a ficha agora.', // (proposto 8.4)
   },
   blocks: {
