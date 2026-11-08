@@ -465,3 +465,73 @@ Deno.test("bug real do 8.9: texto de rodadas intermediárias (rascunho) não vai
   const corpo = await (await handleAgente(req({ mensagem: "jogo hoje?" }), deps(db, modelo))).json();
   assertEquals(corpo.texto, "Hoje tem jogo às 20h30 e o Bar b1 passa.");
 });
+
+// ===================================================================== verifier do 8.9
+
+// Regex do c4-incerto (avaliacao.json): a negação só vale quando nega a afirmação de perto ("não sei se o
+// Bar Leo tem…"); "Confirmado: … tem chopp Brahma" e "Ainda não confirmamos, mas … tem chopp Brahma" são
+// afirmação de Brahma para bar a confirmar e precisam reprovar.
+Deno.test("verifier 8.9: regex do c4-incerto reprova afirmação e aceita dúvida", async () => {
+  const aval = JSON.parse(await Deno.readTextFile(new URL("./avaliacao.json", import.meta.url)));
+  const caso = aval.perguntas.find((c: { id: string }) => c.id === "c4-incerto");
+  const re = new RegExp(caso.espera.texto_nao_contem[0], "i");
+  for (const ruim of [
+    "Confirmado: o Bar Leo tem chopp Brahma.",
+    "Ainda não confirmamos, mas o Bar Leo tem chopp Brahma",
+    "Não tenho dúvida: o Bar Leo tem chopp Brahma",
+    "Sim, o Bar Leo tem chopp Brahma.",
+    "Não, o Bar Leo serve chopp Brahma sim.",
+  ]) assert(re.test(ruim), `deveria reprovar: ${ruim}`);
+  for (const boa of [
+    "Não sei se o Bar Leo tem chopp Brahma hoje: ainda falta confirmar.",
+    "Ninguém confirmou ainda se ele tem chopp Brahma.",
+    "Você pode ver se eles servem chopp Brahma e me contar?",
+    "Está a confirmar. Você sabe se o Bar Leo ainda tem chopp Brahma?",
+  ]) assertFalse(re.test(boa), `deveria aceitar: ${boa}`);
+});
+
+Deno.test("verifier 8.9: jogos_de_hoje aceita dias_a_frente 7 e corta acima de 7", async () => {
+  const { db } = fakeDb();
+  const pedidos: number[] = [];
+  db.jogos = (_t, dias) => { pedidos.push(dias); return Promise.resolve([]); };
+  const { modelo } = fakeModelo([
+    { stop_reason: "tool_use", content: [
+      { type: "tool_use", id: "t1", name: "jogos_de_hoje", input: { time: "Corinthians", dias_a_frente: 7 } } as Anthropic.ToolUseBlock,
+      { type: "tool_use", id: "t2", name: "jogos_de_hoje", input: { time: "Corinthians", dias_a_frente: 30 } } as Anthropic.ToolUseBlock,
+    ] },
+    textoFinal("Não tem jogo."),
+  ]);
+  await handleAgente(req({ mensagem: "quando joga o Corinthians?" }), deps(db, modelo));
+  assertEquals(pedidos, [7, 7]);
+});
+
+// Regra 12.5: football-data fora → o agente diz que não conseguiu atualizar os jogos (o servidor garante a
+// frase mesmo se o modelo esquecer) e a ferramenta avisa o modelo.
+Deno.test("verifier 8.9 (12.5): jogos desatualizados → resposta diz que não conseguiu atualizar", async () => {
+  const { db } = fakeDb();
+  Object.assign(db, { jogosAtualizados: () => Promise.resolve(false) });
+  db.jogos = () => Promise.resolve([
+    { jogo_id: "j1", competicao: "Brasileirão", mandante: "Corinthians", visitante: "Palmeiras", inicio: "2026-11-08T22:00:00Z" },
+  ]);
+  const { modelo, chamadas } = fakeModelo([
+    usoFerramenta("t1", "jogos_de_hoje", { time: "Corinthians" }),
+    textoFinal("Tem Corinthians x Palmeiras às 19h."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "jogo do Corinthians hoje" }), deps(db, modelo))).json();
+  const resultado = JSON.parse((chamadas[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].content as string);
+  assertEquals(resultado.atualizacao_falhou, true);
+  assert(/não consegui atualizar os jogos/i.test(corpo.texto), corpo.texto);
+});
+
+Deno.test("verifier 8.9 (12.5): jogos em dia → nada de aviso", async () => {
+  const { db } = fakeDb();
+  Object.assign(db, { jogosAtualizados: () => Promise.resolve(true) });
+  const { modelo, chamadas } = fakeModelo([
+    usoFerramenta("t1", "jogos_de_hoje", { time: "Corinthians" }),
+    textoFinal("Hoje não tem jogo do Corinthians."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "jogo do Corinthians hoje" }), deps(db, modelo))).json();
+  const resultado = JSON.parse((chamadas[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].content as string);
+  assertFalse("atualizacao_falhou" in resultado);
+  assertEquals(corpo.texto, "Hoje não tem jogo do Corinthians.");
+});

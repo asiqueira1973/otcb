@@ -56,3 +56,43 @@ Deno.test("12.5: football-data fora (4xx/5xx) mantém os jogos gravados e o log 
     assertFalse(JSON.stringify(x.logs).includes("s3gredo"));
   }
 });
+
+// ===================================================================== verifier do 8.9 (12.5)
+
+// Cada execução fica registrada em otcb_execucoes_garimpo (tipo 'jogos'): é por ela que o agente sabe que
+// não conseguiu atualizar os jogos.
+function depsComRegistro(buscar: () => Promise<{ status: number; corpo: unknown }>, gravar?: () => Promise<{ gravados: number; apagados: number }>) {
+  const x = deps();
+  const registros: { status: string; erros: unknown }[] = [];
+  const d = {
+    ...x.d, buscar,
+    ...(gravar ? { gravar } : {}),
+    registrar: (status: "concluida" | "falhou", erros: unknown) => { registros.push({ status, erros }); return Promise.resolve(); },
+  };
+  return { ...x, d, registros };
+}
+
+Deno.test("verifier 8.9 (12.5): execução concluída e falha ficam registradas", async () => {
+  const ok = depsComRegistro(() => Promise.resolve({ status: 200, corpo: FIXTURE }));
+  assertEquals((await handleJogos(req(), ok.d)).status, 200);
+  assertEquals(ok.registros.map((r) => r.status), ["concluida"]);
+
+  const fora = depsComRegistro(() => Promise.resolve({ status: 503, corpo: null }));
+  assertEquals((await handleJogos(req(), fora.d)).status, 502);
+  assertEquals(fora.registros, [{ status: "falhou", erros: { football_data: 503 } }]);
+});
+
+Deno.test("verifier 8.9: falha ao gravar → 500, registra falha e não vaza detalhe", async () => {
+  const x = depsComRegistro(() => Promise.resolve({ status: 200, corpo: FIXTURE }), () => Promise.reject(new Error("db_jogos: boom")));
+  const res = await handleJogos(req(), x.d);
+  assertEquals(res.status, 500);
+  assertEquals(await res.json(), { codigo: "falha_ao_gravar" });
+  assertEquals(x.registros.map((r) => r.status), ["falhou"]);
+});
+
+Deno.test("verifier 8.9: erro de rede com a chave na mensagem não vai ao log", async () => {
+  const x = depsComRegistro(() => Promise.reject(new Error("X-Auth-Token CHAVE-FD-123 recusado")));
+  assertEquals((await handleJogos(req(), x.d)).status, 502);
+  assertFalse(JSON.stringify(x.logs).includes("CHAVE-FD-123"));
+  assertFalse(JSON.stringify(x.registros).includes("CHAVE-FD-123"));
+});
