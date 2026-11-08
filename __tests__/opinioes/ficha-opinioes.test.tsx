@@ -77,3 +77,19 @@ it('o resumo da IA vem antes das opiniões', async () => {
   const textos = screen.getAllByText(/.+/).map((n) => [n.props.children].flat().join(''));
   expect(textos.indexOf('Colarinho caprichado e atendimento rápido.')).toBeLessThan(textos.indexOf(copy.sheet.opinions));
 });
+
+it('verifier 8.8: toque duplo em "Ver mais" busca a página uma vez só', async () => {
+  let soltar: () => void = () => undefined;
+  mockRpc.mockImplementation((_n: string, args: { p_pagina: number }) =>
+    args.p_pagina === 0
+      ? Promise.resolve({ data: Array.from({ length: 10 }, (_, i) => op(i)), error: null })
+      : new Promise((r) => (soltar = () => r({ data: [op(10)], error: null }))));
+  await abrir();
+  await waitFor(() => expect(screen.getByTestId('ficha-ver-mais')).toBeTruthy());
+  await fireEvent.press(screen.getByTestId('ficha-ver-mais'));
+  await fireEvent.press(screen.getByTestId('ficha-ver-mais'));
+  soltar();
+  await waitFor(() => expect(screen.getByText('Opinião 10')).toBeTruthy());
+  expect(mockRpc.mock.calls.filter((c) => c[1].p_pagina === 1)).toHaveLength(1);
+  expect(screen.getAllByText('Opinião 10')).toHaveLength(1);
+});
