@@ -1,6 +1,7 @@
 // Termos de uso e Política de privacidade do OTCB (épico 8.10; seção 20; 25.4: Dab Lab, contato
 // alexandre@dablab.com.br). Rascunho escrito no 8.10, pendente de revisão jurídica antes da publicação.
-// Mudou o texto → atualizar a versão e a data.
+// Mudou o texto → atualizar a versão e a data. Títulos e textos: (proposto 8.10). Os Termos citam Brahma: não
+// reaproveitar como texto de loja sem tirar a marca (15.10).
 
 export type LegalSection = { title: string; body: string };
 export type LegalDoc = { title: string; updatedAt: string; sections: LegalSection[] };
@@ -38,7 +39,7 @@ export const privacyPolicy: LegalDoc = {
       body:
         '• Anthropic (Claude): os textos do chat e as fotos são processados por inteligência artificial para responder, dar a nota do colarinho e moderar opiniões.\n' +
         '• Supabase: onde os dados ficam guardados, com acesso restrito.\n' +
-        '• Medição de uso: contamos eventos do app (por exemplo, "uma foto foi avaliada") sem o texto das mensagens, sem localização e sem fotos.\n\n' +
+        '• Visão de Produto (medição de uso): contamos eventos do app (por exemplo, "uma foto foi avaliada") sem o texto das mensagens, sem localização e sem fotos.\n\n' +
         'Não vendemos seus dados e não usamos para publicidade.',
     },
     {
@@ -57,7 +58,7 @@ export const privacyPolicy: LegalDoc = {
     },
     {
       title: 'Menores de idade',
-      body: 'O OTCB é proibido para menores de 18 anos. Uma conta que indique ser de menor é revisada e pode ser apagada.',
+      body: 'O OTCB é proibido para menores de 18 anos. Quem informa ter menos de 18 anos não entra no app, e uma conversa que indique ser de menor deixa a conta sinalizada para revisão.',
     },
     {
       title: 'Mudanças',

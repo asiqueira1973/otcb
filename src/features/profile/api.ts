@@ -7,13 +7,17 @@ export type MyProfile = { nickname: string; team: string };
 export type SaveProfileResult = 'ok' | 'formato' | 'em_uso' | 'rede';
 
 // Lê o próprio perfil com colunas explícitas (nunca select("*") com o cliente do usuário).
-// Recebe: nada. Devolve: apelido e time, ou null sem sessão, sem rede ou sem perfil.
+// Recebe: nada. Devolve: apelido e time, ou null sem sessão, sem rede ou sem perfil (a tela mostra a 15.9).
 export async function loadMyProfile(): Promise<MyProfile | null> {
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return null;
-  const { data, error } = await supabase.from('otcb_perfis').select('apelido, time_do_coracao').eq('id', auth.user.id).maybeSingle();
-  if (error || !data) return null;
-  return { nickname: data.apelido, team: data.time_do_coracao ?? '' };
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return null;
+    const { data, error } = await supabase.from('otcb_perfis').select('apelido, time_do_coracao').eq('id', auth.user.id).maybeSingle();
+    if (error || !data) return null;
+    return { nickname: data.apelido, team: data.time_do_coracao ?? '' };
+  } catch {
+    return null;
+  }
 }
 
 // Grava apelido e time (grant por coluna do 8.1: o cliente só atualiza essas colunas e o papel).

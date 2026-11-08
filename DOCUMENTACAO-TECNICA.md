@@ -287,12 +287,18 @@ Coluna nova: `otcb_fotos.pessoa_identificavel` (13.5 e seção 28). O cliente n�
   - A URL pública que as lojas pedem fica para o 8.11.
 - **"Apagar meus dados" (`deleteMyData`):**
   1. etapa 1: alerta com a 15.21; etapa 2: "Apagar tudo";
-  2. telemetria `otcb_conta_apagada`, enviada antes, com o uid que vai ser apagado;
-  3. `otcb-apagar-conta`, com limite de 10 s (critério 2);
-  4. só com 200: apaga do AsyncStorage `otcb_fila_fotos`, `otcb_mensagens_locais`, `otcb_passaporte_cache`, `otcb_selos_vistos` e as chaves `otcb_card:*`, apaga a pasta `Documents/otcb-fila` e esquece a marca de perfil (a marca de instalação fica);
+  2. `otcb-apagar-conta`, com limite de 10 s (critério 2);
+  3. só com 200 (ou 401, conta já apagada): telemetria `otcb_conta_apagada` com o uid antigo;
+  4. em seguida, apaga do AsyncStorage `otcb_fila_fotos`, `otcb_mensagens_locais`, `otcb_passaporte_cache`, `otcb_selos_vistos` e as chaves `otcb_card:*`, apaga a pasta `Documents/otcb-fila` e esquece a marca de perfil (a marca de instalação fica);
   5. `signOut` local, nova sessão anônima e Boas-vindas.
 
   Com falha (erro, sem rede ou mais de 10 s), nada é descartado e aparece a 15.9. É diferente do bloqueio de menor (8.1), que descarta a sessão mesmo com falha.
+- **Correções do verifier (8.10):**
+  - depois de apagar, a pilha é esvaziada (`router.dismissAll()`) antes da Boas-vindas: no Android, o voltar levaria a identidade nova ao Chat sem passar pelos 18+;
+  - 401 da função conta como apagada: é a tentativa seguinte a uma que estourou os 10 s depois de o servidor já ter apagado;
+  - `otcb_conta_apagada` só sai depois que o servidor apagou, ainda com o uid antigo e com teto de 2 s, para nunca segurar a tela;
+  - sem rede ao abrir o Perfil, aparece a 15.9 e "Salvar" fica desligado; o valor carregado não sobrescreve o que a pessoa já digitou;
+  - enquanto apaga, "Salvar" e "Limpar conversa" ficam desligados, e o leitor de tela anuncia "Apagando…".
 - **Checagem real (08/11/2026):**
   - por script, um usuário com perfil, foto (com arquivo no bucket), carimbo, opinião, denúncia e mensagem foi apagado em 2,6 s;
   - zero linhas nas seis tabelas, pasta vazia no bucket, a evidência ficou com `usuario_id` nulo e o usuário saiu de `auth.users`;

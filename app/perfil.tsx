@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../src/components/Button';
 import { Mascot } from '../src/components/Mascot';
@@ -25,13 +25,22 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // 'loading' → 'ready' com os valores atuais; 'offline' sem rede (15.9): salvar fica desligado para não
+  // gravar campos vazios.
+  const [load, setLoad] = useState<'loading' | 'ready' | 'offline'>('loading');
 
   useEffect(() => {
     let alive = true;
     void loadMyProfile().then((p) => {
-      if (!alive || !p) return;
-      setNickname(p.nickname);
-      setTeam(p.team);
+      if (!alive) return;
+      if (!p) {
+        setLoad('offline');
+        return;
+      }
+      // Não sobrescreve o que a pessoa já digitou enquanto carregava.
+      setNickname((atual) => atual || p.nickname);
+      setTeam((atual) => atual || p.team);
+      setLoad('ready');
     });
     return () => {
       alive = false;
@@ -39,6 +48,7 @@ export default function Profile() {
   }, []);
 
   async function save() {
+    if (load !== 'ready' || deleting) return;
     setSaving(true);
     setSaved(false);
     const result = await saveMyProfile(nickname, team);
@@ -50,6 +60,7 @@ export default function Profile() {
   }
 
   async function clear() {
+    if (deleting) return;
     setBusy(true);
     const ok = await clearConversation();
     setBusy(false);
@@ -66,12 +77,17 @@ export default function Profile() {
 
   // 15.21: etapa 1 é o texto do alerta; etapa 2 é o botão "Apagar tudo". Sucesso → Boas-vindas com
   // identidade nova; falha → nada é descartado e aparece a 15.9.
+  // Sucesso: esvazia a pilha antes (o Chat antigo não pode ficar atrás da Boas-vindas: no Android o voltar
+  // levaria a identidade nova ao chat sem passar pelos 18+; verifier do 8.10).
   async function runDelete() {
     setDeleting(true);
+    AccessibilityInfo.announceForAccessibility(copy.profile.deleting);
     const ok = await deleteMyData();
     setDeleting(false);
-    if (ok) router.replace('/boas-vindas');
-    else Alert.alert(copy.errors.noNetwork);
+    if (ok) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/boas-vindas');
+    } else Alert.alert(copy.errors.noNetwork);
   }
 
   function confirmDelete() {
@@ -92,6 +108,7 @@ export default function Profile() {
     >
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{copy.profile.title}</Text>
       <Mascot mood="gentil" size={120} />
+      {load === 'offline' ? <Text accessibilityLiveRegion="polite" style={[styles.body, { color: theme.textMuted }]}>{copy.errors.noNetwork}</Text> : null}
 
       <TextField
         testID="perfil-apelido"
@@ -118,10 +135,10 @@ export default function Profile() {
           setSaved(false);
         }}
       />
-      <Button testID="salvar-perfil" label={copy.profile.save} loading={saving} onPress={() => void save()} />
+      <Button testID="salvar-perfil" label={copy.profile.save} loading={saving} disabled={load !== 'ready' || deleting} onPress={() => void save()} />
       {saved ? <Text accessibilityLiveRegion="polite" style={[styles.body, { color: theme.text }]}>{copy.profile.saved}</Text> : null}
 
-      <Button testID="limpar-conversa" variant="ghost" label={copy.profile.clearChat} loading={busy} onPress={confirmClear} />
+      <Button testID="limpar-conversa" variant="ghost" label={copy.profile.clearChat} loading={busy} disabled={deleting} onPress={confirmClear} />
       {done ? <Text accessibilityLiveRegion="polite" style={[styles.body, { color: theme.text }]}>{copy.profile.cleared}</Text> : null}
 
       <View style={styles.links}>
@@ -132,7 +149,6 @@ export default function Profile() {
       <Text style={[styles.body, { color: theme.textMuted }]}>{copy.profile.passportNotice}</Text>
 
       <Button testID="apagar-dados" variant="ghost" label={copy.profile.deleteData} loading={deleting} onPress={confirmDelete} />
-      {deleting ? <Text accessibilityLiveRegion="polite" style={styles.hidden}>{copy.profile.deleting}</Text> : null}
     </Screen>
   );
 }
@@ -142,5 +158,4 @@ const styles = StyleSheet.create({
   body: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22, textAlign: 'center' },
   footer: { fontFamily: fonts.body, fontSize: 14, textAlign: 'center' },
   links: { gap: 4 },
-  hidden: { height: 0, opacity: 0 },
 });

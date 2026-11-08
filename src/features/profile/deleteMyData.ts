@@ -33,13 +33,21 @@ export async function clearLocalData(): Promise<void> {
   await forgetProfile().catch(() => undefined);
 }
 
-// Executa a exclusão. Ordem: telemetria (antes, com o uid atual) → otcb-apagar-conta (até 10 s) → só com
-// sucesso: limpa o aparelho, sai da sessão e cria a identidade anônima nova.
+// Teto da telemetria antes de sair da sessão: ela nunca segura a tela (rede ruim).
+const TELEMETRY_CAP_MS = 2_000;
+
+// Recebe: o erro do supabase-js. Devolve: true se a função respondeu 401 — o JWT já não vale porque a conta
+// foi apagada numa tentativa anterior que estourou o tempo (verifier do 8.10): conta como apagada.
+function alreadyDeleted(error: unknown): boolean {
+  const status = (error as { context?: { status?: number } } | null)?.context?.status;
+  return status === 401;
+}
+
+// Executa a exclusão. Ordem: otcb-apagar-conta (até 10 s) → só com sucesso: telemetria (ainda com o uid
+// antigo, até 2 s) → limpa o aparelho → sai da sessão → cria a identidade anônima nova.
 // Diferente do bloqueio de menor (8.1): se o servidor falhar, nada é descartado e a pessoa vê o erro,
 // para não sair achando que apagou. Recebe: nada. Devolve: true se apagou; false se falhou.
 export async function deleteMyData(): Promise<boolean> {
-  track('otcb_conta_apagada');
-  await flushTelemetry().catch(() => undefined);
   try {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
@@ -47,10 +55,12 @@ export async function deleteMyData(): Promise<boolean> {
     });
     const call = supabase.functions.invoke('otcb-apagar-conta', { method: 'POST' });
     const { error } = await Promise.race([call, timeout]).finally(() => clearTimeout(timer));
-    if (error) return false;
+    if (error && !alreadyDeleted(error)) return false;
   } catch {
     return false;
   }
+  track('otcb_conta_apagada');
+  await Promise.race([flushTelemetry().catch(() => undefined), new Promise((r) => setTimeout(r, TELEMETRY_CAP_MS))]);
   await clearLocalData();
   await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
   // Sem rede aqui, a Boas-vindas segue e a abertura cria a sessão depois (8.1).
