@@ -104,11 +104,30 @@ it('sem rede mostra o último Passaporte carregado, com aviso', async () => {
   expect(screen.getAllByText('3 bares carimbados').length).toBeGreaterThan(0);
 });
 
-it('A7: só selo novo anima e registra otcb_selo_ganho; a primeira abertura só memoriza', async () => {
-  expect(await selosNovos(DADOS.selos)).toEqual([]);
-  expect(mockTrack).not.toHaveBeenCalled();
+// Correção do verifier (8.7): na primeira abertura, os selos já conquistados também são novidade (A7 e seção
+// 21) — a identidade é anônima por aparelho, então não há "outro aparelho" que já tenha mostrado.
+it('A7: na primeira abertura os selos conquistados animam e registram otcb_selo_ganho; depois só os novos', async () => {
+  expect(await selosNovos(DADOS.selos)).toEqual(['primeira_tirada']);
+  expect(mockTrack).toHaveBeenCalledWith('otcb_selo_ganho', { selo: 'primeira_tirada' });
+  mockTrack.mockClear();
   const depois = DADOS.selos.map((s) => (s.selo === 'explorador' ? { ...s, nivel: 1, conquistado: true } : s));
   expect(await selosNovos(depois)).toEqual(['explorador']);
   expect(mockTrack).toHaveBeenCalledWith('otcb_selo_ganho', { selo: 'explorador' });
   expect(await selosNovos(depois)).toEqual([]);
+});
+
+it('sem rede e sem cache: mostra a 15.9 e "Tentar de novo", não uma tela em branco', async () => {
+  mockRpc.mockRejectedValue(new TypeError('Network request failed'));
+  await renderWithSafeArea(<Passaporte />);
+  await waitFor(() => expect(screen.getByText(copy.errors.noNetwork)).toBeTruthy());
+  mockRpc.mockResolvedValue({ data: DADOS, error: null });
+  await fireEvent.press(screen.getByTestId('passaporte-tentar'));
+  await waitFor(() => expect(screen.getByText('3 bares carimbados')).toBeTruthy());
+});
+
+it('11.11: todos os bairros com bares ativos aparecem, com os que têm carimbo primeiro', async () => {
+  await renderWithSafeArea(<Passaporte />);
+  await waitFor(() => expect(screen.getByLabelText('Itaim Bibi: 0 de 5 bares')).toBeTruthy());
+  const ordem = screen.getAllByTestId(/^bairro-/).map((n) => n.props.testID);
+  expect(ordem).toEqual(['bairro-Moema', 'bairro-Santa Ifigênia', 'bairro-Pinheiros', 'bairro-Itaim Bibi']);
 });
