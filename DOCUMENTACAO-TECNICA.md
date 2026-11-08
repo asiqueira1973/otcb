@@ -62,7 +62,7 @@ Extensões usadas, liberadas pelo Alexandre: `pg_trgm`, `unaccent` e `pg_net` (n
 - `bar_id` e `distancia_bar_metros`: nulos sem bar a até 150 m.
 - `caminho_storage` = `{usuario_id}/{id}.jpg`. Um CHECK obriga a pasta a ser a do dono.
 - `e_chopp` (resposta da IA) e `usuario_confirmou_brahma` (resposta do usuário).
-- As quatro notas parciais e `nota_colarinho`, todas de 0 a 10 (11.5).
+- As quatro notas parciais (`nota_altura`, `nota_cremosidade`, `nota_copo`, `nota_gelado`) e `nota_colarinho`, a média ponderada calculada fora do modelo, todas de 0 a 10 (11.5).
 - `comentario_ia` e `modelo_ia`.
 - `excluido_em`: soft delete pelo dono.
 
@@ -74,9 +74,9 @@ Extensões usadas, liberadas pelo Alexandre: `pg_trgm`, `unaccent` e `pg_net` (n
 
 **`otcb_mensagens`**: o histórico do chat (`papel`, `conteudo`, `blocos` em jsonb). Fica guardado por 30 dias.
 
-**`otcb_jogos`**: os jogos do football-data.org (`id_externo` único). São apagados 2 dias depois do início.
+**`otcb_jogos`**: os jogos do football-data.org (`id_externo` único), com `competicao` (nome em português), `mandante`, `visitante` e `inicio` (UTC). São apagados 2 dias depois do início.
 
-**`otcb_execucoes_garimpo`**: o registro de cada execução do garimpo (tipo, status, cursor, contadores e `erros`).
+**`otcb_execucoes_garimpo`**: o registro de cada execução do garimpo e da `otcb-jogos` (tipo `jogos`, desde o 8.9): `tipo`, `status`, `cursor`, `iniciado_em`, `concluido_em`, os contadores `bares_novos`, `evidencias_criadas`, `chamadas_google` e `chamadas_firecrawl`, e `erros` (sem chaves nem dado pessoal).
 
 **Bucket `otcb-fotos`**: privado, aceita só JPEG de até 1 MB e usa uma pasta por usuário.
 
@@ -571,6 +571,23 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - todos `incerto` com pontuação 0,2;
   - a segunda execução importou 0 (33 já existentes).
 
+### Publicação (8.11)
+- **`app.config.ts`** (no lugar do `app.json`):
+  - `name: 'OTCB'`, `owner: 'alexsiq'`, bundle e pacote `com.dablab.otcb` (24.8);
+  - só iPhone (`supportsTablet: false`, decisão do Alexandre);
+  - `usesNonExemptEncryption: false`;
+  - permissões só de câmera e localização em uso; o Android bloqueia microfone e localização em segundo plano;
+  - splash pelo plugin `expo-splash-screen` (no SDK 58 não fica mais na raiz do config);
+  - projeto EAS `@alexsiq/otcb`.
+- **`eas.json`:** perfis `development`, `preview` e `production` (`autoIncrement`), versão local. O envio iOS usa a chave da API do App Store Connect da Dab Lab em `secrets/` (fora do git). O Android sai para teste interno, como rascunho.
+- **Ícone e splash:** a bolacha sobre o azul `#1F4AA8` (ícone) e sobre `#F4F7FB` (splash), sem texto e sem copo.
+- **Fichas das lojas** em `store/`, geradas com o skill `app-store-dablab`:
+  - Support URL do Carrd e política no documento da Dab Lab no Notion, com uma seção do OTCB;
+  - questionário de privacidade com localização efêmera, fotos, conteúdo do usuário, ID anônimo e uso;
+  - notas de revisão que explicam o app inteiro;
+  - classificação esperada 18+.
+- **Marca fora da loja:** o teste `__tests__/store-brand.test.ts` falha se "brahma" aparecer em `store/`, `app.config.ts` ou `eas.json`. Ele reforça o hook `guard-store-brand.sh`, que só age quando o Claude Code roda a partir da pasta do OTCB.
+
 ## 6. Divergências em relação ao spec
 
 | Item | O que mudou | Motivo |
@@ -629,3 +646,5 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | `jogos_de_hoje` com `outros_jogos` (8.9) | A ferramenta devolve até 10 jogos de outros times além dos do time pedido. | O modelo usa como contexto; o card `jogos` mostra só o que ele escolheu. |
 | Falha em "Apagar meus dados" (8.10) | A sessão e os dados do aparelho ficam; aparece a 15.9. | O spec não trata a falha. Descartar a sessão faria a pessoa achar que apagou com os dados ainda no servidor. |
 | Termos e Privacidade (8.10) | Telas do app com texto embutido, e não links externos. | Funcionam sem rede; a URL pública para as lojas fica para o 8.11. |
+| Configuração em `app.config.ts` sem a marca (8.11) | Os textos de permissão do sistema dizem "chopp", sem a marca. | O hook e o teste de marca cobrem `app.config.ts`; o texto de permissão aparece também na revisão da loja. |
+| Disponibilidade na loja (8.11) | Sugestão: só Brasil. | O conteúdo cobre só São Paulo (anti-escopo "app nacional"); o padrão da Dab Lab é todos os países, e a escolha final é do Alexandre. |
