@@ -2,7 +2,7 @@ import Anthropic from "npm:@anthropic-ai/sdk@^0";
 
 import { CacheTurno } from "./blocos.ts";
 import { executarFerramenta, FERRAMENTAS, type Turno } from "./ferramentas.ts";
-import { PROMPT_AGENTE_V2 } from "./prompts/agente.v2.ts";
+import { PROMPT_AGENTE_V4 } from "./prompts/agente.v4.ts";
 import type { AgenteDb, Bloco } from "./tipos.ts";
 
 // Loop do agente do chat (seções 4.1, 13.1 e 13.3). Modelo da seção 4.1: claude-sonnet-5-5.
@@ -77,7 +77,7 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
   const messages = montarMensagens(entrada);
   // O prompt fixo e as ferramentas ficam em cache (prefixo estável); o contexto do turno vem depois.
   const system: Anthropic.TextBlockParam[] = [
-    { type: "text", text: PROMPT_AGENTE_V2, cache_control: { type: "ephemeral" } },
+    { type: "text", text: PROMPT_AGENTE_V4, cache_control: { type: "ephemeral" } },
     { type: "text", text: contextoDoTurno(entrada) },
   ];
   const textos: string[] = [];

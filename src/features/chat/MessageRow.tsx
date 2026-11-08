@@ -39,7 +39,7 @@ export function MessageRow({ message, animate, onRetry }: Props) {
               hitSlop={12}
               style={styles.retry}
             >
-              <Text style={[styles.retryText, { color: theme.accent }]}>{copy.errors.retry}</Text>
+              <Text style={[styles.retryText, { color: theme.link }]}>{copy.errors.retry}</Text>
             </Pressable>
           </View>
         ) : null}

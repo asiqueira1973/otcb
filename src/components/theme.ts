@@ -1,7 +1,14 @@
 import { useColorScheme } from 'react-native';
 
-// Tokens visuais do OTCB (spec 16.2, 16.3 e 16.5). Sem vermelho como cor principal.
+// Tokens visuais do OTCB (16.2, 16.3 e 16.5), com a emenda do Alexandre no 8.4: sair do creme pastel para
+// branco, azul e vermelho (inspirado no copo de chopp Brahma, sem copiar a marca). O azul é a cor principal;
+// o vermelho é só acento (marca "OTCB" e câmera), nunca a cor dominante; o âmbar fica para o chopp.
 export const palette = {
+  blue: '#1F4AA8',
+  blueDeep: '#14336F', // sombra sólida do botão azul (efeito botão de jogo, 16.1)
+  red: '#D22630',
+  white: '#FFFFFF',
+  mist: '#F4F7FB', // fundo claro, frio, no lugar do creme
   amber: '#F2A900',
   amberDeep: '#C98C00', // sombra sólida do botão âmbar (efeito botão de jogo, 16.1)
   foam: '#FFF6E3',
@@ -23,36 +30,39 @@ export type Theme = {
   primary: string;
   primaryShadow: string;
   onPrimary: string;
-  accent: string;
+  accent: string; // acento vermelho: marca e câmera
+  link: string; // ações de texto (atalhos, "tentar de novo")
   border: string;
   error: string;
   dark: boolean;
 };
 
 const light: Theme = {
-  background: palette.foam,
-  card: '#FFFFFF',
-  text: palette.ink,
-  textMuted: '#5E574C',
-  primary: palette.amber,
-  primaryShadow: palette.amberDeep,
-  onPrimary: palette.ink,
-  accent: palette.bottle,
-  border: '#E8DCC2',
+  background: palette.mist,
+  card: palette.white,
+  text: '#14203A',
+  textMuted: '#4E5B73',
+  primary: palette.blue,
+  primaryShadow: palette.blueDeep,
+  onPrimary: palette.white,
+  accent: palette.red,
+  link: palette.blue,
+  border: '#D9E1EE',
   error: palette.error,
   dark: false,
 };
 
 const dark: Theme = {
-  background: palette.ink,
-  card: palette.inkCard,
-  text: palette.foam,
-  textMuted: '#CFC4AE',
-  primary: palette.amber,
-  primaryShadow: palette.amberDeep,
-  onPrimary: palette.ink,
-  accent: '#5FB39D',
-  border: '#4A4238',
+  background: '#0E1628',
+  card: '#18233D',
+  text: '#F4F7FB',
+  textMuted: '#AEB9CF',
+  primary: '#3566D6',
+  primaryShadow: '#1F3F8C',
+  onPrimary: palette.white,
+  accent: '#E5484D',
+  link: '#8FB0FF',
+  border: '#2A3858',
   error: '#F07A7A',
   dark: true,
 };

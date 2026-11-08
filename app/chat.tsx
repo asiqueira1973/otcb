@@ -46,13 +46,13 @@ export default function Chat() {
     <BarSheetProvider>
       <SafeAreaView style={[styles.root, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <Text accessibilityRole="header" style={[styles.brand, { color: theme.text }]}>{copy.brand}</Text>
+          <Text accessibilityRole="header" style={[styles.brand, { color: theme.accent }]}>{copy.brand}</Text>
           <View style={styles.shortcuts}>
             <Pressable testID="atalho-passaporte" accessibilityRole="button" accessibilityLabel={copy.chat.passport} onPress={showComingSoon} style={styles.shortcut}>
-              <Text style={[styles.shortcutText, { color: theme.accent }]}>{copy.chat.passport}</Text>
+              <Text style={[styles.shortcutText, { color: theme.link }]}>{copy.chat.passport}</Text>
             </Pressable>
             <Pressable testID="atalho-perfil" accessibilityRole="button" accessibilityLabel={copy.chat.profile} onPress={() => router.push('/perfil')} style={styles.shortcut}>
-              <Text style={[styles.shortcutText, { color: theme.accent }]}>{copy.chat.profile}</Text>
+              <Text style={[styles.shortcutText, { color: theme.link }]}>{copy.chat.profile}</Text>
             </Pressable>
           </View>
         </View>
@@ -97,7 +97,7 @@ export default function Chat() {
               accessibilityRole="button"
               accessibilityLabel={copy.chat.camera}
               onPress={showComingSoon}
-              style={[styles.round, { backgroundColor: theme.accent }]}
+              style={[styles.round, styles.camera, { backgroundColor: theme.card, borderColor: theme.primary }]}
             >
               <Text style={styles.roundIcon}>📷</Text>
             </Pressable>
@@ -146,5 +146,6 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1 },
   round: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   roundIcon: { fontSize: 20, color: '#FFFFFF' },
+  camera: { borderWidth: 2 },
   input: { flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 24, borderWidth: 2, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, fontFamily: fonts.body, fontSize: 17 },
 });

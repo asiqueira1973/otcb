@@ -327,7 +327,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   1. **Guardrail 11.18** (`guardrails.ts`): regex sem acento, na ordem menor → dirigir → quantidade → compra. "Tenho N" só conta como idade com "anos" ou no fim da frase; "compra" exige comprar, pedir que o OTCB venda ou entregue, ou levar para casa ("o bar vende chopp Brahma?" e "você sabe se o bar vende…?" passam; "você(s)" só conta colado ao verbo); "desafio" só com bebida. Responde o texto fixo da 15.11 e não chama o modelo. O log leva só `{evento:'guardrail', tipo}`; "menor" também marca `revisao_menor_em`.
   2. **Limite, contexto e perfil**, consultados em paralelo e adiantados pelo `sub` do JWT enquanto o Auth valida o token. Nada é usado antes da confirmação; `sub` diferente do usuário confirmado → 401. Risco aceito: um token forjado provoca 3 leituras de serviço antes de ser recusado (o resultado é descartado e nada vaza). Com 40 mensagens no dia → 429.
   3. **Modelo** `claude-sonnet-5-5`, com esforço `low`:
-     - o prompt fixo `prompts/agente.v2.ts` e as ferramentas ficam em cache; o contexto do turno (apelido, time, localização e hora de SP) vem num bloco de sistema separado;
+     - o prompt fixo `prompts/agente.v4.ts` e as ferramentas ficam em cache; o contexto do turno (apelido, time, localização e hora de SP) vem num bloco de sistema separado;
      - no máximo 5 rodadas de ferramenta; a 6ª chamada usa `tool_choice: none`;
      - se a rodada traz texto e só chama `mostrar`, o turno termina ali (critério 8).
 - **Ferramentas (13.3):**
@@ -340,7 +340,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Avaliação:**
   - `avaliacao.json` tem 20 perguntas com o esperado de cada uma, e `npm run agente:avaliar [-- --repetir N]` roda contra o BANCO DE TESTE com um usuário descartável;
   - o script faz uma chamada de aquecimento fora da conta;
-  - resultado final em 08/11/2026: 40/40, p50 5,2 s, p95 6,9 s (Wi-Fi, 34 respostas do modelo, função aquecida). Não foi medido em 4G.
+  - resultado final em 08/11/2026: 40/40, p50 5,2 s, p95 6,9 s (Wi-Fi, 34 respostas do modelo, função aquecida). Não foi medido em 4G; o Alexandre aceitou a medida em Wi-Fi para o critério 8 (08/11/2026).
 
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
@@ -394,4 +394,6 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | "Chopp Brahma" nos textos (8.4) | 15.1 "Onde tem chopp Brahma bem tirado?", 15.3 "Pra achar o chopp Brahma mais perto…", 15.4 "Chopp Brahma perto de mim", 15.13 "Pergunta onde tem chopp Brahma…". | Emenda do Alexandre: o app é só sobre chopp Brahma. A loja (15.10) continua sem a palavra. |
 | Perfil mínimo e "em breve" (8.4) | T9 só com "Limpar conversa", aviso 15.20 e rodapé 15.12; câmera e Passaporte mostram "em breve". | O resto entra no 8.10, 8.6 e 8.7. |
 | Prompt do agente em `.ts` | O plano dizia `prompts/agente.v1.md`. | O bundle da Edge Function não lê arquivos `.md` sem configuração extra; a regra de versionamento vale igual (`agente.vN.ts`). |
+| Paleta (emenda do Alexandre, 08/11/2026) | O creme pastel e o âmbar principal da 16.2 saíram: fundo branco-frio `#F4F7FB`, azul `#1F4AA8` como cor principal (botões, bolhas do usuário, links), vermelho `#D22630` só como acento (a marca "OTCB"), âmbar só no chopp (copinho A1, Bolacha). As cores de status (16.2) continuam. Modo escuro em azul-marinho. | O app é só sobre chopp Brahma; o Alexandre pediu branco, azul e vermelho sem copiar a marca e sem o vermelho dominante. |
+| Prompt do agente v3 e v4 (8.4) | "Chopp Brahma" no texto e nos títulos; o texto se sustenta sozinho e não fala de "card". | Pedido do Alexandre (só Brahma); a v3 gerou textos como "Mostrei o bar no card acima". |
 | Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |
