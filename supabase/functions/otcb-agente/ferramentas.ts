@@ -136,7 +136,8 @@ export async function montarCardEntrada(p: Record<string, unknown>, db: AgenteDb
   }
 }
 
-export type Turno = { cache: CacheTurno; blocos: Bloco[]; local: { latitude: number; longitude: number } | null };
+// jogosDesatualizados (regra 12.5): a última atualização dos jogos falhou; o agente avisa na resposta.
+export type Turno = { cache: CacheTurno; blocos: Bloco[]; local: { latitude: number; longitude: number } | null; jogosDesatualizados?: boolean };
 
 // Executa uma ferramenta. Recebe: nome, entrada, banco e turno. Devolve: o conteúdo (JSON) para o modelo.
 // Erros viram { erro } para o modelo — a ferramenta nunca derruba a conversa.
@@ -178,12 +179,17 @@ export async function executarFerramenta(nome: string, entrada: Record<string, u
       case "jogos_de_hoje": {
         const dias = Math.min(Math.max(Number(entrada.dias_a_frente ?? 0), 0), 7);
         const time = typeof entrada.time === "string" && entrada.time.trim() ? entrada.time.trim() : null;
-        const jogos = await db.jogos(time, dias);
+        // Regra 12.5: se não der para saber se os jogos estão em dia, não acusa falha.
+        const [jogos, emDia] = await Promise.all([db.jogos(time, dias), db.jogosAtualizados().catch(() => true)]);
         for (const j of jogos) turno.cache.jogos.set(j.jogo_id, j);
+        if (!emDia) turno.jogosDesatualizados = true;
+        const aviso = emDia ? {} : { atualizacao_falhou: true };
         // 8.9: diz ao modelo quais jogos são do time pedido (os demais vêm só como contexto).
         const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const doTime = time ? jogos.filter((j) => norm(`${j.mandante} ${j.visitante}`).includes(norm(time))) : [];
-        return JSON.stringify(time ? { time_pedido: time, jogos_do_time: doTime, outros_jogos: jogos.filter((j) => !doTime.includes(j)).slice(0, 10) } : { jogos });
+        return JSON.stringify(time
+          ? { time_pedido: time, jogos_do_time: doTime, outros_jogos: jogos.filter((j) => !doTime.includes(j)).slice(0, 10), ...aviso }
+          : { jogos, ...aviso });
       }
       case "meu_passaporte": {
         const p = await db.meuPassaporte();

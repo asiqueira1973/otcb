@@ -22,6 +22,12 @@ Deno.serve((req) =>
       if (error) throw new Error(`db_jogos: ${error.message}`);
       return data as { gravados: number; apagados: number };
     },
+    async registrar(status, erros) {
+      const agora = new Date().toISOString();
+      const { error } = await admin.from("otcb_execucoes_garimpo")
+        .insert({ tipo: "jogos", status, iniciado_em: agora, concluido_em: agora, erros });
+      if (error) throw new Error(`db_execucoes: ${error.message}`);
+    },
     agora: () => new Date(),
     log: (e) => console.log(JSON.stringify({ funcao: "otcb-jogos", ...e })),
   })

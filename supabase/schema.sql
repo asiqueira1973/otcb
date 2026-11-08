@@ -819,7 +819,7 @@ begin
   select decrypted_secret into v_url from vault.decrypted_secrets where name = 'otcb_url_funcoes';
   select decrypted_secret into v_segredo from vault.decrypted_secrets where name = 'otcb_cron_secret';
   if v_url is null or v_segredo is null then
-    raise exception 'garimpo_nao_configurado' using errcode = 'P0001';
+    raise exception 'jogos_nao_configurado' using errcode = 'P0001';
   end if;
   return net.http_post(
     url := v_url || '/otcb-jogos',

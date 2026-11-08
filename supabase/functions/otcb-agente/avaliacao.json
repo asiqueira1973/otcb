@@ -80,7 +80,7 @@
           "confirm"
         ],
         "texto_nao_contem": [
-          "(?<!(n[ãa]o|\\bse\\b|confirm\\w*)[^.!?]{0,40})\\b(tem|serve)m? (sim )?chopp brahma\\b"
+          "(?<!\\b(n[ãa]o|nem|se)\\s+([^\\s.,;:!?]+\\s+){0,4})\\b(tem|serve)m? (sim )?chopp brahma\\b"
         ]
       }
     },

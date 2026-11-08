@@ -18,6 +18,7 @@ function deps(status = 200, corpo: unknown = FIXTURE) {
       gravar: (dados: unknown) => { gravados.push(dados); return Promise.resolve({ gravados: 1, apagados: 0 }); },
       agora: () => new Date("2026-11-08T03:30:00Z"), // 00:30 em SP
       log: (e: unknown) => logs.push(e),
+      registrar: () => Promise.resolve(),
     },
   };
 }

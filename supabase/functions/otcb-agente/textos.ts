@@ -15,4 +15,6 @@ export const TEXTOS = {
   perguntaTemBrahma: (bar: string) => `O ${bar} ainda tem chopp Brahma?`,
   perguntaJogos: (bar: string) => `O ${bar} passa jogo?`,
   perguntaFuncionamento: (bar: string) => `O ${bar} fechou?`,
+  // (proposto 8.9) regra 12.5: football-data fora; os jogos mostrados são os da última atualização.
+  jogosDesatualizados: "Não consegui atualizar os jogos hoje, então essa lista pode estar desatualizada.",
 } as const;

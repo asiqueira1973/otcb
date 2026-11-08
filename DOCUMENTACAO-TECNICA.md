@@ -507,11 +507,15 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - cancelados e adiados são apagados;
   - partida sem time definido fica de fora.
 - **football-data fora:** responde 502 e mantém os jogos gravados (12.5). O log leva só o status.
+- **Falha ao gravar:** responde 500 (`falha_ao_gravar`), sem detalhe.
+- **Registro (12.5):** cada execução vira uma linha em `otcb_execucoes_garimpo` com tipo `jogos` e status `concluida` ou `falhou`. Em `erros` vai só o status do football-data ou `{gravar: true}`, nunca a chave.
+- **Erro do disparo:** sem URL ou segredo no Vault, `otcb_jogos_disparar` levanta `jogos_nao_configurado` (migration `20261108001400`).
 - **Primeira execução real (08/11/2026):** 36 jogos, 2 do Brasileirão.
 
 ### Agente: onde ver o jogo (8.9)
-- **`jogos_de_hoje`:** com time, devolve `jogos_do_time` e `outros_jogos`.
-- **Prompt v6:**
+- **`jogos_de_hoje`:** com time, devolve `jogos_do_time` e `outros_jogos`. Com time, a busca lê a janela inteira antes de filtrar (o limite de 50 escondia o jogo do time).
+- **Jogos desatualizados (12.5):** a última execução da `otcb-jogos` falhou, passou de 36 h ou não existe. Então `jogos_de_hoje` traz `atualizacao_falhou` e a resposta sempre diz "Não consegui atualizar os jogos hoje…": o prompt v7 pede isso e, se o modelo esquecer, o servidor acrescenta a frase.
+- **Prompt v6 (v7 = v6 + o aviso da 12.5):**
   - procura o jogo do time hoje;
   - se não tiver, procura nos próximos 7 dias e diz quando é o próximo;
   - depois `buscar_bares` com `transmite_jogos`;
@@ -594,3 +598,5 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Selo e foto apagada (8.7) | O selo "Olho clínico" continua contando a foto apagada pelo dono. | A 11.11 não trata o caso; segue o critério 3 do 8.7, em que a conquista não regride, como o carimbo. Confirmado pelo Alexandre (08/11/2026). |
 | Clássicos (8.7) | A coleção só aparece quando há bar clássico. | A 25.5 foi adiada pelo Alexandre (começar sem clássicos). |
 | Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |
+| Jogos desatualizados (8.9) | Critério de "não atualizou": última execução da `otcb-jogos` com falha, com mais de 36 h ou ausente; o texto do aviso é proposto ("Não consegui atualizar os jogos hoje…"). | A 12.5 pede o aviso, mas não diz quando nem com que texto; o cron é diário, então 36 h dá folga para um atraso. |
+| `jogos_de_hoje` com `outros_jogos` (8.9) | A ferramenta devolve até 10 jogos de outros times além dos do time pedido. | O modelo usa como contexto; o card `jogos` mostra só o que ele escolheu. |

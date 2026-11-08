@@ -48,6 +48,8 @@ export function createAgenteDb(admin: SupabaseClient, usuario: SupabaseClient): 
     },
     // jogos_de_hoje (13.3; seção 9 jogos): do início de hoje (SP) até o fim do dia hoje + dias; jogos do
     // time pedido primeiro (time do coração quando o modelo passa), depois por horário.
+    // Com time, lê a janela inteira antes de filtrar (verifier do 8.9: o limite de 50 escondia o jogo do time
+    // num dia cheio); a tabela só guarda 7 dias (13.9), então o teto de 2000 nunca corta na prática.
     async jogos(time, dias) {
       const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       const inicio = new Date(`${hojeSp}T00:00:00-03:00`);
@@ -55,7 +57,7 @@ export function createAgenteDb(admin: SupabaseClient, usuario: SupabaseClient): 
       const { data, error } = await usuario.from("otcb_jogos")
         .select("id, competicao, mandante, visitante, inicio")
         .gte("inicio", inicio.toISOString()).lt("inicio", fim.toISOString())
-        .order("inicio").limit(50);
+        .order("inicio").limit(time ? 2000 : 50);
       if (error) throw new Error(`db_jogos: ${error.message}`);
       const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
       const alvo = time ? norm(time) : null;
@@ -63,6 +65,15 @@ export function createAgenteDb(admin: SupabaseClient, usuario: SupabaseClient): 
       if (!alvo) return jogos;
       const doTime = (j: Jogo) => norm(j.mandante).includes(alvo) || norm(j.visitante).includes(alvo);
       return [...jogos.filter(doTime), ...jogos.filter((j) => !doTime(j))];
+    },
+    // Regra 12.5: os jogos estão em dia se a última execução da otcb-jogos (otcb_execucoes_garimpo, tipo
+    // 'jogos') foi concluída há menos de 36 h (o cron é diário). Sem execução, ou com falha, não estão.
+    async jogosAtualizados() {
+      const { data, error } = await admin.from("otcb_execucoes_garimpo").select("status, iniciado_em")
+        .eq("tipo", "jogos").order("iniciado_em", { ascending: false }).limit(1).maybeSingle();
+      if (error) throw new Error(`db_execucoes: ${error.message}`);
+      if (!data || data.status !== "concluida") return false;
+      return Date.now() - new Date(data.iniciado_em).getTime() < 36 * 3_600_000;
     },
     meuPassaporte: () => rpc(usuario, "otcb_meu_passaporte", {}),
     // RLS otcb_opinioes_le_proprias: com o JWT da pessoa, só a própria opinião (de qualquer status) volta.

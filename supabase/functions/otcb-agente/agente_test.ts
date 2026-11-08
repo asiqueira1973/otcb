@@ -35,6 +35,7 @@ function fakeDb(opts: { hoje?: number; bares?: Record<string, unknown>[] } = {})
     detalhesBar: (id) => Promise.resolve((opts.bares ?? []).find((b) => b.bar_id === id) ?? Promise.reject(new Error("bar_inexistente"))),
     opinioesDoBar: () => Promise.resolve([]),
     jogos: () => Promise.resolve([]),
+    jogosAtualizados: () => Promise.resolve(true),
     meuPassaporte: () => Promise.resolve({ carimbos: [], colecoes_bairro: [], selos: [] }),
     minhaOpiniao: () => Promise.resolve(null),
   };

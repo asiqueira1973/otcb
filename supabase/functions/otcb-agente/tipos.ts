@@ -44,6 +44,8 @@ export interface AgenteDb {
   detalhesBar(barId: string): Promise<Record<string, unknown>>;
   opinioesDoBar(barId: string, pagina: number): Promise<{ opiniao_id: string; apelido: string; nota: number | null; texto: string; criado_em: string }[]>;
   jogos(time: string | null, diasAFrente: number): Promise<Jogo[]>;
+  // Regra 12.5: false quando a última atualização dos jogos falhou ou está velha (o agente avisa).
+  jogosAtualizados(): Promise<boolean>;
   meuPassaporte(): Promise<Record<string, unknown>>;
   // Opinião atual da própria pessoa sobre o bar (critério 5 do 8.5), lida com o JWT dela (RLS).
   minhaOpiniao(barId: string): Promise<{ texto: string; nota: number | null } | null>;
