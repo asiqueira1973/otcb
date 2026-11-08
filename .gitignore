@@ -32,3 +32,6 @@ secrets/
 *.aab
 *.apk
 *.ipa
+
+# Referências de design locais (fora do git)
+referencias de telas.pdf
