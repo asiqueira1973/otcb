@@ -57,3 +57,6 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - `claude-haiku-5-5` raciocina antes de responder: `max_tokens` pequeno (200–400) termina no raciocínio, sem JSON (`stop_reason: max_tokens`). Use ≥ 2048 e `effort: "low"`; corte de texto sempre no fim de palavra.
 - Quando o agente errar a mesma coisa duas vezes, a correção entra aqui.
 - Submissão à Apple (8.11): as notas de revisão e a descrição precisam explicar o app inteiro (agente de IA no chat, Colarinhômetro, Passaporte, confirmação colaborativa, localização) — nunca "lista de bares". O Alexandre já foi reprovado (guideline 4.2) com "poderia ser um site".
+- Cache local novo com dado da pessoa (AsyncStorage ou arquivo) entra em `clearLocalData` (`src/features/profile/deleteMyData.ts`), senão "Apagar meus dados" deixa resto no aparelho.
+- Deploy de Edge Function no CLI pede `--yes` em modo agente (o Alexandre deixou autorizado para as `otcb-*`).
+- Metro do OTCB: `npx expo start --port 8091` (a 8081 é de outro projeto); o atalho "Perfil" do Chat fica sob a engrenagem do Expo no simulador; use o deep link `exp://127.0.0.1:8091/--/perfil`.

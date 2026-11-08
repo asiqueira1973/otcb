@@ -239,7 +239,8 @@ Coluna nova: `otcb_fotos.pessoa_identificavel` (13.5 e seção 28). O cliente n�
 | Cards de entrada (8.5) | `src/features/cards/` | `otcb_opinioes` (a própria) | `otcb_confirmar_bar`, `otcb_sugerir_bar`, `otcb_registrar_card`, insert em `otcb_denuncias`, Edge Function `otcb-opinioes` |
 | T7 Câmera (8.6) | `app/camera.tsx` + `src/features/colarinhometro/` | — | Edge Function `otcb-colarinhometro` |
 | T8 Passaporte (8.7) | `app/passaporte.tsx` + `src/features/passaporte/` | `otcb_meu_passaporte` | — |
-| T9 Perfil (mínimo) | `app/perfil.tsx` | — | `delete` em `otcb_mensagens` (próprias) |
+| T9 Perfil (8.4 e 8.10) | `app/perfil.tsx` + `src/features/profile/` | `otcb_perfis` (`apelido, time_do_coracao`, a própria) | `update` de apelido e time, `delete` em `otcb_mensagens` (próprias), Edge Function `otcb-apagar-conta` |
+| Termos e Privacidade (8.10) | `app/termos.tsx`, `app/privacidade.tsx` + `src/lib/legal.ts` | — | — |
 
 ## 5. Lógica por tela, Edge Function e script
 
@@ -277,6 +278,26 @@ Coluna nova: `otcb_fotos.pessoa_identificavel` (13.5 e seção 28). O cliente n�
   4. o usuário em `auth.users`.
 - Respostas: 200 `{ok: true}`; 401 sem JWT válido; 405 fora de POST; 500 `{error: 'falha_exclusao'}`, sem dado pessoal no log.
 - No app, `deleteAccountAndSignOut` também trata o `error` que o supabase-js devolve em vez de lançar.
+
+### Perfil e "Apagar meus dados" (8.10)
+- **Apelido e time:** lidos com colunas explícitas e gravados por `update` (grant por coluna do 8.1). A validação reusa `validateNickname` e `nicknameErrorFromDb`, com as mesmas mensagens do onboarding.
+- **Termos de uso e Política de privacidade:** telas do app com o texto em `src/lib/legal.ts` (versão 1, 08/11/2026). Abrem sem rede.
+  - 25.4 respondida pelo Alexandre (08/11/2026): assina a **Dab Lab**, contato **alexandre@dablab.com.br**.
+  - O texto é um rascunho escrito no 8.10, seguindo a seção 20; **precisa de revisão jurídica** antes da publicação.
+  - A URL pública que as lojas pedem fica para o 8.11.
+- **"Apagar meus dados" (`deleteMyData`):**
+  1. etapa 1: alerta com a 15.21; etapa 2: "Apagar tudo";
+  2. telemetria `otcb_conta_apagada`, enviada antes, com o uid que vai ser apagado;
+  3. `otcb-apagar-conta`, com limite de 10 s (critério 2);
+  4. só com 200: apaga do AsyncStorage `otcb_fila_fotos`, `otcb_mensagens_locais`, `otcb_passaporte_cache`, `otcb_selos_vistos` e as chaves `otcb_card:*`, apaga a pasta `Documents/otcb-fila` e esquece a marca de perfil (a marca de instalação fica);
+  5. `signOut` local, nova sessão anônima e Boas-vindas.
+
+  Com falha (erro, sem rede ou mais de 10 s), nada é descartado e aparece a 15.9. É diferente do bloqueio de menor (8.1), que descarta a sessão mesmo com falha.
+- **Checagem real (08/11/2026):**
+  - por script, um usuário com perfil, foto (com arquivo no bucket), carimbo, opinião, denúncia e mensagem foi apagado em 2,6 s;
+  - zero linhas nas seis tabelas, pasta vazia no bucket, a evidência ficou com `usuario_id` nulo e o usuário saiu de `auth.users`;
+  - no simulador, o fluxo Perfil → Apagar → Boas-vindas funcionou: a conta antiga sumiu e uma identidade anônima nova foi criada;
+  - os dados de teste foram limpos e o bar, recalculado.
 
 ### Edge Function `otcb-garimpo` (13.6; épico 8.3)
 
@@ -600,3 +621,5 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |
 | Jogos desatualizados (8.9) | Critério de "não atualizou": última execução da `otcb-jogos` com falha, com mais de 36 h ou ausente; o texto do aviso é proposto ("Não consegui atualizar os jogos hoje…"). | A 12.5 pede o aviso, mas não diz quando nem com que texto; o cron é diário, então 36 h dá folga para um atraso. |
 | `jogos_de_hoje` com `outros_jogos` (8.9) | A ferramenta devolve até 10 jogos de outros times além dos do time pedido. | O modelo usa como contexto; o card `jogos` mostra só o que ele escolheu. |
+| Falha em "Apagar meus dados" (8.10) | A sessão e os dados do aparelho ficam; aparece a 15.9. | O spec não trata a falha. Descartar a sessão faria a pessoa achar que apagou com os dados ainda no servidor. |
+| Termos e Privacidade (8.10) | Telas do app com texto embutido, e não links externos. | Funcionam sem rede; a URL pública para as lojas fica para o 8.11. |
