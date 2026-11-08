@@ -211,14 +211,14 @@ isOneToOne: false
                   ]
                 },"otcb_perfis": {
                   Row: {
-                    "apelido": string,"atualizado_em": string,"criado_em": string,"id": string,"maioridade_confirmada_em": string,"papel": Database["public"]['Enums']["otcb_papel"],"time_do_coracao": string | null
+                    "apelido": string,"atualizado_em": string,"criado_em": string,"id": string,"maioridade_confirmada_em": string,"papel": Database["public"]['Enums']["otcb_papel"],"revisao_menor_em": string | null,"time_do_coracao": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "apelido": string,"atualizado_em"?: string,"criado_em"?: string,"id": string,"maioridade_confirmada_em": string,"papel"?: Database["public"]['Enums']["otcb_papel"],"time_do_coracao"?: string | null
+                    "apelido": string,"atualizado_em"?: string,"criado_em"?: string,"id": string,"maioridade_confirmada_em": string,"papel"?: Database["public"]['Enums']["otcb_papel"],"revisao_menor_em"?: string | null,"time_do_coracao"?: string | null
                   }
                   Update: {
-                    "apelido"?: string,"atualizado_em"?: string,"criado_em"?: string,"id"?: string,"maioridade_confirmada_em"?: string,"papel"?: Database["public"]['Enums']["otcb_papel"],"time_do_coracao"?: string | null
+                    "apelido"?: string,"atualizado_em"?: string,"criado_em"?: string,"id"?: string,"maioridade_confirmada_em"?: string,"papel"?: Database["public"]['Enums']["otcb_papel"],"revisao_menor_em"?: string | null,"time_do_coracao"?: string | null
                   }
                   Relationships: [
                     
@@ -283,6 +283,11 @@ isOneToOne: false
 "otcb_confirmar_bar":
 { Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_bar_id": string,"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"] }; Returns: Json
                            },
+"otcb_contexto_chat":
+{ Args: { "p_usuario": string }; Returns: {
+              "conteudo": string,"criado_em": string,"papel": Database["public"]['Enums']["otcb_papel_mensagem"]
+            }[]
+                           },
 "otcb_detalhes_bar":
 { Args: { "p_bar_id": string }; Returns: Json
                            },
@@ -316,11 +321,22 @@ isOneToOne: false
 "otcb_limpeza_diaria":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"otcb_marcar_revisao_menor":
+{ Args: { "p_usuario": string }; Returns: undefined
+                           },
+"otcb_mensagens_hoje":
+{ Args: { "p_usuario": string }; Returns: number
+                           },
 "otcb_meu_passaporte":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "otcb_normalizar":
 { Args: { "p_texto": string }; Returns: string
+                           },
+"otcb_opinioes_do_bar":
+{ Args: { "p_bar_id": string,"p_pagina"?: number }; Returns: {
+              "apelido": string,"criado_em": string,"nota": number,"opiniao_id": string,"texto": string
+            }[]
                            },
 "otcb_recalcular_bar":
 { Args: { "p_bar_id": string }; Returns: Database["public"]['Enums']["otcb_status_bar"]

@@ -51,3 +51,4 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - Testes de banco nunca contam a tabela inteira: filtre pelos dados da fixture.
 - Hooks de `.claude/settings.json` só valem em sessão do Claude Code aberta nesta pasta.
 - Quando o agente errar a mesma coisa duas vezes, a correção entra aqui.
+- Submissão à Apple (8.11): as notas de revisão e a descrição precisam explicar o app inteiro (agente de IA no chat, Colarinhômetro, Passaporte, confirmação colaborativa, localização) — nunca "lista de bares". O Alexandre já foi reprovado (guideline 4.2) com "poderia ser um site".

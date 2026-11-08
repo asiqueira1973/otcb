@@ -536,6 +536,23 @@ $$;
 ALTER FUNCTION "public"."otcb_contar_denuncia"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_contexto_chat"("p_usuario" "uuid") RETURNS TABLE("papel" "public"."otcb_papel_mensagem", "conteudo" "text", "criado_em" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select m.papel, m.conteudo, m.criado_em
+    from (select papel, conteudo, criado_em
+            from public.otcb_mensagens
+           where usuario_id = p_usuario and criado_em >= now() - interval '6 hours'
+           order by criado_em desc
+           limit 20) m
+   order by m.criado_em;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_contexto_chat"("p_usuario" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_definir_atualizado_em"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -774,6 +791,29 @@ $$;
 ALTER FUNCTION "public"."otcb_limpeza_diaria"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_marcar_revisao_menor"("p_usuario" "uuid") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update public.otcb_perfis set revisao_menor_em = coalesce(revisao_menor_em, now()) where id = p_usuario;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_marcar_revisao_menor"("p_usuario" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_mensagens_hoje"("p_usuario" "uuid") RETURNS integer
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select count(*)::integer from public.otcb_mensagens
+   where usuario_id = p_usuario and papel = 'usuario' and public.otcb_dia_sp(criado_em) = public.otcb_hoje_sp();
+$$;
+
+
+ALTER FUNCTION "public"."otcb_mensagens_hoje"("p_usuario" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_meu_passaporte"() RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -865,6 +905,23 @@ $$;
 
 
 ALTER FUNCTION "public"."otcb_normalizar"("p_texto" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_opinioes_do_bar"("p_bar_id" "uuid", "p_pagina" integer DEFAULT 0) RETURNS TABLE("opiniao_id" "uuid", "apelido" "text", "nota" smallint, "texto" "text", "criado_em" timestamp with time zone)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select o.id, p.apelido, o.nota, o.texto, o.criado_em
+    from public.otcb_opinioes o
+    join public.otcb_perfis p on p.id = o.usuario_id
+    join public.otcb_bares b on b.id = o.bar_id and b.excluido_em is null
+   where o.bar_id = p_bar_id and o.status = 'publicada'
+   order by o.criado_em desc
+   limit 10 offset greatest(coalesce(p_pagina, 0), 0) * 10;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_opinioes_do_bar"("p_bar_id" "uuid", "p_pagina" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_processar_foto"() RETURNS "trigger"
@@ -1357,6 +1414,7 @@ CREATE TABLE IF NOT EXISTS "public"."otcb_perfis" (
     "time_do_coracao" "text",
     "criado_em" timestamp with time zone DEFAULT "now"() NOT NULL,
     "atualizado_em" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "revisao_menor_em" timestamp with time zone,
     CONSTRAINT "otcb_perfis_apelido_formato" CHECK (((("char_length"("apelido") >= 3) AND ("char_length"("apelido") <= 20)) AND ("apelido" ~ '^[A-Za-z0-9_.]+$'::"text")))
 );
 
@@ -1365,6 +1423,10 @@ ALTER TABLE "public"."otcb_perfis" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."otcb_perfis" IS 'Perfil do usuário anônimo do OTCB (spec 7.2). Data de nascimento nunca é gravada; só o instante da confirmação de maioridade (seção 6).';
+
+
+
+COMMENT ON COLUMN "public"."otcb_perfis"."revisao_menor_em" IS 'Instante em que o guardrail 11.18 detectou menção a idade abaixo de 18 no chat (revisão do admin).';
 
 
 
@@ -1836,6 +1898,11 @@ GRANT ALL ON FUNCTION "public"."otcb_contar_denuncia"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_contexto_chat"("p_usuario" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_contexto_chat"("p_usuario" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."otcb_definir_atualizado_em"() TO "anon";
 GRANT ALL ON FUNCTION "public"."otcb_definir_atualizado_em"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."otcb_definir_atualizado_em"() TO "service_role";
@@ -1907,6 +1974,16 @@ GRANT ALL ON FUNCTION "public"."otcb_limpeza_diaria"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_marcar_revisao_menor"("p_usuario" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_marcar_revisao_menor"("p_usuario" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_mensagens_hoje"("p_usuario" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_mensagens_hoje"("p_usuario" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."otcb_meu_passaporte"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_meu_passaporte"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."otcb_meu_passaporte"() TO "service_role";
@@ -1916,6 +1993,12 @@ GRANT ALL ON FUNCTION "public"."otcb_meu_passaporte"() TO "service_role";
 REVOKE ALL ON FUNCTION "public"."otcb_normalizar"("p_texto" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_normalizar"("p_texto" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."otcb_normalizar"("p_texto" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_opinioes_do_bar"("p_bar_id" "uuid", "p_pagina" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_opinioes_do_bar"("p_bar_id" "uuid", "p_pagina" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."otcb_opinioes_do_bar"("p_bar_id" "uuid", "p_pagina" integer) TO "service_role";
 
 
 
@@ -2037,19 +2120,35 @@ GRANT UPDATE("motivo_ocultacao") ON TABLE "public"."otcb_opinioes" TO "authentic
 
 
 GRANT ALL ON TABLE "public"."otcb_perfis" TO "service_role";
-GRANT SELECT,INSERT ON TABLE "public"."otcb_perfis" TO "authenticated";
+GRANT INSERT ON TABLE "public"."otcb_perfis" TO "authenticated";
 
 
 
-GRANT UPDATE("apelido") ON TABLE "public"."otcb_perfis" TO "authenticated";
+GRANT SELECT("id") ON TABLE "public"."otcb_perfis" TO "authenticated";
 
 
 
-GRANT UPDATE("papel") ON TABLE "public"."otcb_perfis" TO "authenticated";
+GRANT SELECT("apelido"),UPDATE("apelido") ON TABLE "public"."otcb_perfis" TO "authenticated";
 
 
 
-GRANT UPDATE("time_do_coracao") ON TABLE "public"."otcb_perfis" TO "authenticated";
+GRANT SELECT("papel"),UPDATE("papel") ON TABLE "public"."otcb_perfis" TO "authenticated";
+
+
+
+GRANT SELECT("maioridade_confirmada_em") ON TABLE "public"."otcb_perfis" TO "authenticated";
+
+
+
+GRANT SELECT("time_do_coracao"),UPDATE("time_do_coracao") ON TABLE "public"."otcb_perfis" TO "authenticated";
+
+
+
+GRANT SELECT("criado_em") ON TABLE "public"."otcb_perfis" TO "authenticated";
+
+
+
+GRANT SELECT("atualizado_em") ON TABLE "public"."otcb_perfis" TO "authenticated";
 
 
 

@@ -1,0 +1,276 @@
+// Testes do agente do chat (épico 8.4; seção 22): banco e modelo simulados, sem rede.
+import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
+import type Anthropic from "npm:@anthropic-ai/sdk@^0";
+
+import { montarBlocos, CacheTurno, paraCardBar } from "./blocos.ts";
+import { MAX_RODADAS, type ModeloAgente } from "./agente.ts";
+import { verificarGuardrail } from "./guardrails.ts";
+import { handleAgente, LIMITE_DIARIO, validarEntrada } from "./handler.ts";
+import { TEXTOS } from "./textos.ts";
+import type { AgenteDb } from "./tipos.ts";
+
+const BAR = (id: string, status: string, extra: Record<string, unknown> = {}) => ({
+  bar_id: id, nome: `Bar ${id}`, bairro: "Pinheiros", endereco: "Rua X, 1", latitude: -23.56, longitude: -46.68,
+  distancia_metros: 300, status, tem_balcao: true, transmite_jogos: false, classico: false,
+  nota_colarinho_media: 8.5, nota_opinioes_media: 4.2, qtd_opinioes: 3, ultima_confirmacao_em: null,
+  confirmacoes_60_dias: 1, resumo_opinioes: null, ...extra,
+});
+
+type Gravada = { papel: string; conteudo: string; blocos: unknown };
+
+function fakeDb(opts: { hoje?: number; bares?: Record<string, unknown>[] } = {}) {
+  const estado = { gravadas: [] as Gravada[], revisaoMenor: 0, buscas: [] as Record<string, unknown>[] };
+  const db: AgenteDb = {
+    usuarioDoToken: (t) => Promise.resolve(t === "token-ok" ? "u1" : null),
+    perfil: () => Promise.resolve({ apelido: "ana_sp", time_do_coracao: null }),
+    mensagensHoje: () => Promise.resolve(opts.hoje ?? 0),
+    contexto: () => Promise.resolve([]),
+    gravarMensagens: (_u, msgs) => {
+      estado.gravadas.push(...msgs);
+      return Promise.resolve(msgs.map((_, i) => `m${estado.gravadas.length + i}`));
+    },
+    marcarRevisaoMenor: () => { estado.revisaoMenor += 1; return Promise.resolve(); },
+    buscarBares: (p) => { estado.buscas.push(p); return Promise.resolve(opts.bares ?? []); },
+    detalhesBar: (id) => Promise.resolve((opts.bares ?? []).find((b) => b.bar_id === id) ?? Promise.reject(new Error("bar_inexistente"))),
+    opinioesDoBar: () => Promise.resolve([]),
+    jogos: () => Promise.resolve([]),
+    meuPassaporte: () => Promise.resolve({ carimbos: [], colecoes_bairro: [], selos: [] }),
+  };
+  return { db, estado };
+}
+
+// Modelo roteirizado: cada chamada devolve o próximo passo; registra os parâmetros recebidos.
+function fakeModelo(passos: (Partial<Anthropic.Message> | Error)[]) {
+  const chamadas: Anthropic.MessageCreateParamsNonStreaming[] = [];
+  const modelo: ModeloAgente = {
+    criar(params) {
+      chamadas.push(structuredClone(params));
+      const passo = passos[Math.min(chamadas.length - 1, passos.length - 1)];
+      if (passo instanceof Error) return Promise.reject(passo);
+      return Promise.resolve({ id: "x", type: "message", role: "assistant", model: "m", stop_reason: "end_turn",
+        stop_sequence: null, usage: {} as Anthropic.Usage, content: [], ...passo } as Anthropic.Message);
+    },
+  };
+  return { modelo, chamadas };
+}
+
+const usoFerramenta = (id: string, name: string, input: unknown): Partial<Anthropic.Message> => ({
+  stop_reason: "tool_use", content: [{ type: "tool_use", id, name, input } as Anthropic.ToolUseBlock],
+});
+const textoFinal = (text: string): Partial<Anthropic.Message> => ({
+  stop_reason: "end_turn", content: [{ type: "text", text, citations: null } as Anthropic.TextBlock],
+});
+
+function req(corpo: unknown, token = "token-ok") {
+  return new Request("http://local/otcb-agente", {
+    method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(corpo),
+  });
+}
+
+function deps(db: AgenteDb, modelo: ModeloAgente, logs: Record<string, unknown>[] = []) {
+  return { db: () => db, modelo: () => modelo, log: (e: Record<string, unknown>) => logs.push(e) };
+}
+
+// ===================================================================== guardrails 11.18
+
+Deno.test("11.18: guardrails detectam os quatro casos e deixam perguntas normais passarem", () => {
+  assertEquals(verificarGuardrail("tenho 16 anos, onde tem chopp?")?.tipo, "menor");
+  assertEquals(verificarGuardrail("Vou DIRIGIR depois, qual bar?")?.tipo, "dirigir");
+  assertEquals(verificarGuardrail("quantos chopps preciso pra ficar bêbado")?.tipo, "quantidade");
+  assertEquals(verificarGuardrail("vocês entregam chopp em casa?")?.tipo, "compra");
+  assertEquals(verificarGuardrail("chopp perto de mim com balcão"), null);
+  assertEquals(verificarGuardrail("Bar do Nico"), null);
+  assertEquals(verificarGuardrail("onde passa o jogo do Corinthians?"), null);
+});
+
+Deno.test("critério 5: guardrail responde o texto fixo sem chamar o modelo e loga só o tipo", async () => {
+  const { db, estado } = fakeDb();
+  const { modelo, chamadas } = fakeModelo([textoFinal("não devia")]);
+  const logs: Record<string, unknown>[] = [];
+  const res = await handleAgente(req({ mensagem: "vou dirigir, qual bar?" }), deps(db, modelo, logs));
+  const corpo = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(corpo.texto, TEXTOS.guardrailDirigir);
+  assertEquals(corpo.bloqueada_guardrail, true);
+  assertEquals(chamadas.length, 0);
+  assertEquals(logs, [{ evento: "guardrail", tipo: "dirigir" }]);
+  assertEquals(estado.gravadas.map((g) => g.papel), ["usuario", "assistente"]);
+});
+
+Deno.test("11.18: menção a menor marca a conta para revisão", async () => {
+  const { db, estado } = fakeDb();
+  const { modelo, chamadas } = fakeModelo([textoFinal("x")]);
+  const res = await handleAgente(req({ mensagem: "tenho 17 anos" }), deps(db, modelo));
+  assertEquals((await res.json()).texto, TEXTOS.guardrailMenor);
+  assertEquals(estado.revisaoMenor, 1);
+  assertEquals(chamadas.length, 0);
+});
+
+// ===================================================================== limite 11.6
+
+Deno.test("critério 6: a 41ª mensagem do dia recebe 429 com a copy 15.8 sem chamar o modelo", async () => {
+  const { db, estado } = fakeDb({ hoje: LIMITE_DIARIO });
+  const { modelo, chamadas } = fakeModelo([textoFinal("x")]);
+  const res = await handleAgente(req({ mensagem: "chopp perto de mim" }), deps(db, modelo));
+  assertEquals(res.status, 429);
+  assertEquals(await res.json(), { codigo: "limite_mensagens", texto: TEXTOS.limiteMensagens });
+  assertEquals(chamadas.length, 0);
+  assertEquals(estado.gravadas.length, 0);
+});
+
+Deno.test("a 40ª mensagem do dia ainda passa", async () => {
+  const { db } = fakeDb({ hoje: LIMITE_DIARIO - 1 });
+  const { modelo } = fakeModelo([textoFinal("Opa!")]);
+  assertEquals((await handleAgente(req({ mensagem: "oi" }), deps(db, modelo))).status, 200);
+});
+
+// ===================================================================== entrada e autenticação
+
+Deno.test("13.1: 401 sem token válido, 422 para mensagem vazia, longa ou coordenada pela metade", async () => {
+  const { db } = fakeDb();
+  const { modelo } = fakeModelo([textoFinal("x")]);
+  assertEquals((await handleAgente(req({ mensagem: "oi" }, "ruim"), deps(db, modelo))).status, 401);
+  assertEquals((await handleAgente(req({ mensagem: "   " }), deps(db, modelo))).status, 422);
+  assertEquals((await handleAgente(req({ mensagem: "a".repeat(1001) }), deps(db, modelo))).status, 422);
+  assertEquals((await handleAgente(req({ mensagem: "oi", latitude: -23.5 }), deps(db, modelo))).status, 422);
+  assertEquals(validarEntrada({ mensagem: "oi", latitude: -23.5, longitude: -46.6 })?.local, { latitude: -23.5, longitude: -46.6 });
+});
+
+// ===================================================================== fluxo com ferramentas
+
+Deno.test("critério 1: busca perto usa a localização do turno e devolve lista_bares montada pelo servidor", async () => {
+  const { db, estado } = fakeDb({ bares: [BAR("b1", "confirmado"), BAR("b2", "provavel")] });
+  const { modelo, chamadas } = fakeModelo([
+    usoFerramenta("t1", "buscar_bares", { tem_balcao: true }),
+    usoFerramenta("t2", "mostrar", { blocos: [{ tipo: "lista_bares", titulo: "Com balcão perto", bar_ids: ["b1", "b2"] }] }),
+    textoFinal("Achei dois com balcão."),
+  ]);
+  const res = await handleAgente(req({ mensagem: "chopp perto de mim com balcão", latitude: -23.56, longitude: -46.68 }), deps(db, modelo));
+  const corpo = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(estado.buscas[0].p_latitude, -23.56);
+  assertEquals(estado.buscas[0].p_tem_balcao, true);
+  assertEquals(corpo.blocos.length, 1);
+  assertEquals(corpo.blocos[0].tipo, "lista_bares");
+  assertEquals(corpo.blocos[0].bares.map((b: { bar_id: string }) => b.bar_id), ["b1", "b2"]);
+  assertEquals(corpo.texto, "Achei dois com balcão.");
+  assertEquals(chamadas.length, 3);
+});
+
+Deno.test("critério 3: sem_brahma e fechado nunca chegam ao modelo nem aos blocos", async () => {
+  const { db } = fakeDb({ bares: [BAR("ok", "confirmado"), BAR("sb", "sem_brahma"), BAR("fx", "fechado")] });
+  const { modelo, chamadas } = fakeModelo([
+    usoFerramenta("t1", "buscar_bares", { bairro: "Pinheiros" }),
+    usoFerramenta("t2", "mostrar", { blocos: [{ tipo: "lista_bares", titulo: "X", bar_ids: ["ok", "sb", "fx"] }, { tipo: "card_bar", bar_id: "fx" }] }),
+    textoFinal("Pronto."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "bares em Pinheiros" }), deps(db, modelo))).json();
+  const resultadoFerramenta = JSON.stringify(chamadas[1].messages.at(-1));
+  assertFalse(resultadoFerramenta.includes("sem_brahma"));
+  assertFalse(resultadoFerramenta.includes("fechado"));
+  assertEquals(corpo.blocos.length, 1, "o card_bar do bar fechado é descartado");
+  assertEquals(corpo.blocos[0].bares.map((b: { bar_id: string }) => b.bar_id), ["ok"]);
+});
+
+Deno.test("critério 4: incerto chega ao modelo como a_confirmar e o card mantém status incerto", async () => {
+  const { db } = fakeDb({ bares: [BAR("inc", "incerto")] });
+  const { modelo, chamadas } = fakeModelo([
+    usoFerramenta("t1", "buscar_bares", { texto: "Bar inc" }),
+    usoFerramenta("t2", "mostrar", { blocos: [{ tipo: "card_bar", bar_id: "inc" }] }),
+    textoFinal("Esse ainda está a confirmar."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "Bar inc" }), deps(db, modelo))).json();
+  const resultadoFerramenta = JSON.stringify(chamadas[1].messages.at(-1));
+  assert(resultadoFerramenta.includes("a_confirmar"));
+  assertFalse(resultadoFerramenta.includes("incerto"));
+  assertEquals(corpo.blocos[0].bar.status, "incerto");
+});
+
+Deno.test("13.1: bloco inválido ou com bar inventado é descartado e o texto é mantido", () => {
+  const cache = new CacheTurno();
+  cache.bares.set("b1", paraCardBar(BAR("b1", "confirmado"), null)!);
+  const { blocos, descartados } = montarBlocos([
+    { tipo: "card_bar", bar_id: "inventado" },
+    { tipo: "lista_bares", titulo: "Vazio", bar_ids: [] },
+    { tipo: "acao", acao: "chamar_uber", bar_id: "b1", rotulo: "Chamar Uber" },
+    { tipo: "acao", acao: "explodir", rotulo: "x" },
+    { tipo: "passaporte" },
+    { tipo: "formulario_opiniao", bar_id: "b1" },
+    "lixo",
+  ], cache);
+  assertEquals(blocos, [{ tipo: "acao", acao: "chamar_uber", bar_id: "b1", rotulo: "Chamar Uber" }]);
+  assertEquals(descartados, 6);
+});
+
+Deno.test("13.1: no máximo 5 rodadas de ferramenta; a última chamada proíbe ferramentas", async () => {
+  const { db } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  const passos = Array.from({ length: MAX_RODADAS }, (_, i) => usoFerramenta(`t${i}`, "buscar_bares", { bairro: "Pinheiros" }));
+  const { modelo, chamadas } = fakeModelo([...passos, textoFinal("Fim.")]);
+  const res = await handleAgente(req({ mensagem: "bares" }), deps(db, modelo));
+  assertEquals(res.status, 200);
+  assertEquals(chamadas.length, MAX_RODADAS + 1);
+  assertEquals(chamadas.at(-1)!.tool_choice, { type: "none" });
+});
+
+Deno.test("sem localização e sem bairro, buscar_bares devolve erro para o modelo pedir o bairro", async () => {
+  const { db, estado } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  const { modelo, chamadas } = fakeModelo([usoFerramenta("t1", "buscar_bares", {}), textoFinal("Em que bairro você está?")]);
+  const corpo = await (await handleAgente(req({ mensagem: "chopp perto de mim" }), deps(db, modelo))).json();
+  assertEquals(estado.buscas.length, 0);
+  assert(JSON.stringify(chamadas[1].messages.at(-1)).includes("sem_localizacao"));
+  assertEquals(corpo.blocos, []);
+});
+
+// ===================================================================== falhas e privacidade
+
+Deno.test("erro do modelo → 503 ia_indisponivel e nada gravado", async () => {
+  const { db, estado } = fakeDb();
+  const { modelo } = fakeModelo([new Error("rede caiu")]);
+  const res = await handleAgente(req({ mensagem: "oi" }), deps(db, modelo));
+  assertEquals(res.status, 503);
+  assertEquals((await res.json()).codigo, "ia_indisponivel");
+  assertEquals(estado.gravadas.length, 0);
+});
+
+Deno.test("seção 17/20: a localização vai ao modelo mas não é gravada nem logada; nada de texto ou token no log", async () => {
+  const { db, estado } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  const { modelo, chamadas } = fakeModelo([textoFinal("Opa.")]);
+  const logs: Record<string, unknown>[] = [];
+  await handleAgente(req({ mensagem: "segredo da Ana", latitude: -23.123456, longitude: -46.654321 }), deps(db, modelo, logs));
+  assert(JSON.stringify(chamadas[0].system).includes("-23.12346"));
+  const gravado = JSON.stringify(estado.gravadas);
+  assertFalse(gravado.includes("23.12"));
+  assertFalse(gravado.includes("46.65"));
+  const logado = JSON.stringify(logs);
+  for (const proibido of ["segredo", "23.12", "token-ok", "Bearer"]) assertFalse(logado.includes(proibido), proibido);
+});
+
+Deno.test("resposta só com cards usa o texto padrão e grava os blocos", async () => {
+  const { db, estado } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  const { modelo } = fakeModelo([
+    usoFerramenta("t1", "detalhes_bar", { bar_id: "b1" }),
+    usoFerramenta("t2", "mostrar", { blocos: [{ tipo: "card_bar", bar_id: "b1" }] }),
+    { stop_reason: "end_turn", content: [] },
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "Bar b1" }), deps(db, modelo))).json();
+  assertEquals(corpo.texto, TEXTOS.soCards);
+  assertEquals((estado.gravadas[1].blocos as unknown[]).length, 1);
+});
+
+// ===================================================================== latência (critério 8)
+
+Deno.test("critério 8: rodada que só chama mostrar encerra o turno sem nova chamada ao modelo", async () => {
+  const { db } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  const { modelo, chamadas } = fakeModelo([
+    usoFerramenta("t1", "buscar_bares", { texto: "Bar b1" }),
+    { stop_reason: "tool_use", content: [
+      { type: "text", text: "Achei o Bar b1.", citations: null } as Anthropic.TextBlock,
+      { type: "tool_use", id: "t2", name: "mostrar", input: { blocos: [{ tipo: "card_bar", bar_id: "b1" }] } } as Anthropic.ToolUseBlock,
+    ] },
+    textoFinal("não devia ser chamado"),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "Bar b1" }), deps(db, modelo))).json();
+  assertEquals(chamadas.length, 2);
+  assertEquals(corpo.texto, "Achei o Bar b1.");
+  assertEquals(corpo.blocos[0].tipo, "card_bar");
+});

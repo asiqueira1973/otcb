@@ -48,7 +48,8 @@
     "test:functions": "deno test --config supabase/functions/deno.json --allow-read supabase/functions",
     "build:check": "expo export --platform all --output-dir dist",
     "seed:import": "tsx --env-file=.env --env-file=.env.local scripts/import-seed.ts",
-    "garimpo:configurar": "tsx --env-file=.env --env-file=.env.local scripts/configurar-garimpo.ts"
+    "garimpo:configurar": "tsx --env-file=.env --env-file=.env.local scripts/configurar-garimpo.ts",
+    "agente:avaliar": "tsx --env-file=.env --env-file=.env.local scripts/avaliar-agente.ts"
   },
   "private": true,
   "jest": {
