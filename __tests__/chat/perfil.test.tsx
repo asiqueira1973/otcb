@@ -14,8 +14,15 @@ import { renderWithSafeArea } from '../../test-utils/render';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
+const mockDismissAll = jest.fn();
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), replace: (...a: unknown[]) => mockReplace(...a), push: (...a: unknown[]) => mockPush(...a) },
+  router: {
+    back: jest.fn(),
+    replace: (...a: unknown[]) => mockReplace(...a),
+    push: (...a: unknown[]) => mockPush(...a),
+    canDismiss: () => true,
+    dismissAll: () => mockDismissAll(),
+  },
 }));
 
 const mockDelete = jest.fn();
@@ -27,6 +34,7 @@ const mockSignOut = jest.fn();
 const mockGetSession = jest.fn();
 const mockSignInAnon = jest.fn();
 let mockPerfil: { apelido: string; time_do_coracao: string | null } | null = { apelido: 'ana_sp', time_do_coracao: 'Corinthians' };
+let mockPerfilErro: unknown = null;
 jest.mock('../../src/lib/supabase', () => ({
   supabase: {
     auth: {
@@ -38,7 +46,7 @@ jest.mock('../../src/lib/supabase', () => ({
     functions: { invoke: (...a: unknown[]) => mockInvoke(...a) },
     from: (t: string) => ({
       delete: () => { mockDelete(t); return { eq: (...a: unknown[]) => mockEq(...a) }; },
-      select: (cols: string) => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: cols ? mockPerfil : null, error: null }) }) }),
+      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: mockPerfilErro ? null : mockPerfil, error: mockPerfilErro }) }) }),
       update: (v: unknown) => { mockUpdate(t, v); return { eq: (...a: unknown[]) => mockUpdateEq(...a) }; },
     }),
   },
@@ -65,6 +73,7 @@ const LOCAL = ['otcb_fila_fotos', 'otcb_mensagens_locais', 'otcb_passaporte_cach
 beforeEach(async () => {
   jest.clearAllMocks();
   mockPerfil = { apelido: 'ana_sp', time_do_coracao: 'Corinthians' };
+  mockPerfilErro = null;
   mockEq.mockResolvedValue({ error: null });
   mockUpdateEq.mockResolvedValue({ error: null });
   mockInvoke.mockResolvedValue({ data: { ok: true }, error: null });
@@ -171,8 +180,8 @@ describe('8.10 Apagar meus dados', () => {
     expect(mockForget).toHaveBeenCalled();
     expect(mockDirDelete).toHaveBeenCalledWith('otcb-fila');
     expect([...(await AsyncStorage.getAllKeys())].sort()).toEqual(['otcb_instalacao']);
-    // A telemetria sai antes da exclusão, com o uid antigo.
-    expect(mockTrack.mock.invocationCallOrder[0]).toBeLessThan(mockInvoke.mock.invocationCallOrder[0]);
+    // A telemetria sai antes do signOut, ainda com o uid antigo.
+    expect(mockTrack.mock.invocationCallOrder[0]).toBeLessThan(mockSignOut.mock.invocationCallOrder[0]);
   });
 
   it.each([
@@ -201,5 +210,60 @@ describe('8.10 Apagar meus dados', () => {
     jest.useRealTimers();
     await waitFor(() => expect(alert).toHaveBeenCalledWith(copy.errors.noNetwork));
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+});
+
+// ===================================================================== verifier do 8.10
+
+describe('verifier 8.10', () => {
+  it('impedimento: depois de apagar, a pilha é esvaziada antes da Boas-vindas (o Chat antigo não fica atrás)', async () => {
+    pressInAlert(copy.profile.deleteAction);
+    await renderWithSafeArea(<Profile />);
+    await fireEvent.press(screen.getByTestId('apagar-dados'));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/boas-vindas'));
+    expect(mockDismissAll).toHaveBeenCalled();
+    expect(mockDismissAll.mock.invocationCallOrder[0]).toBeLessThan(mockReplace.mock.invocationCallOrder[0]);
+  });
+
+  it('401 da função (conta já apagada numa tentativa que estourou o tempo) conta como apagada', async () => {
+    mockInvoke.mockResolvedValue({ data: null, error: Object.assign(new Error('401'), { context: { status: 401 } }) });
+    pressInAlert(copy.profile.deleteAction);
+    await renderWithSafeArea(<Profile />);
+    await fireEvent.press(screen.getByTestId('apagar-dados'));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/boas-vindas'));
+    expect(mockSignOut).toHaveBeenCalled();
+  });
+
+  it('otcb_conta_apagada só sai quando o servidor apagou', async () => {
+    mockInvoke.mockResolvedValue({ data: null, error: Object.assign(new Error('500'), { context: { status: 500 } }) });
+    const alert = pressInAlert(copy.profile.deleteAction);
+    await renderWithSafeArea(<Profile />);
+    await fireEvent.press(screen.getByTestId('apagar-dados'));
+    await waitFor(() => expect(alert).toHaveBeenCalledWith(copy.errors.noNetwork));
+    expect(mockTrack).not.toHaveBeenCalledWith('otcb_conta_apagada');
+  });
+
+  it('sem rede ao abrir: mostra a 15.9 e não deixa salvar campos vazios', async () => {
+    mockPerfilErro = { message: 'Network request failed' };
+    await renderWithSafeArea(<Profile />);
+    expect(await screen.findByText(copy.errors.noNetwork)).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('salvar-perfil'));
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByText(copy.nickname.formatError)).toBeNull();
+  });
+
+  it('enquanto apaga, Salvar e Limpar conversa ficam desativados', async () => {
+    mockInvoke.mockReturnValue(new Promise(() => undefined));
+    // Confirma qualquer alerta (apagar e limpar), para o teste não passar só porque o alerta não foi aceito.
+    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    await renderWithSafeArea(<Profile />);
+    await waitFor(() => expect(screen.getByTestId('perfil-apelido').props.value).toBe('ana_sp'));
+    await fireEvent.press(screen.getByTestId('apagar-dados'));
+    await fireEvent.press(screen.getByTestId('salvar-perfil'));
+    await fireEvent.press(screen.getByTestId('limpar-conversa'));
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 });
