@@ -195,6 +195,15 @@ O cliente passou a ler `otcb_perfis` por coluna (todas menos `revisao_menor_em`)
 
 Colunas novas: `otcb_opinioes.edicoes_dia` e `edicoes_qtd`, que só o serviço grava e o cliente não lê.
 
+### Funções do Colarinhômetro (épico 8.6; service-only)
+
+| Nome | O que faz |
+|---|---|
+| `otcb_fotos_hoje(usuario)` | Conta as fotos do dia de SP, inclusive as que não eram chopp (limite de 10, 11.6). |
+| `otcb_resultado_foto(foto)` | Depois do insert, devolve `{carimbo_novo, motivo_sem_carimbo, nome_bar, total_carimbos}` e grava a mensagem `sistema` (11.13). Os motivos são `nao_e_chopp`, `sem_bar`, `nao_confirmou`, `ja_tinha` e `limite_dia`. |
+
+Coluna nova: `otcb_fotos.pessoa_identificavel` (13.5 e seção 28). O cliente não lê.
+
 ### Jobs do `pg_cron` (horários em UTC; São Paulo é UTC−3)
 
 | Job | Quando | Chama |
@@ -221,6 +230,7 @@ O `otcb_cron_jogos` entra no épico 8.9.
 | T5 Chat | `app/chat.tsx` + `src/features/chat/` | `otcb_mensagens` (histórico próprio) | Edge Function `otcb-agente` |
 | T6 Ficha do bar | `src/features/bares/BarSheet.tsx` | `otcb_detalhes_bar`, `otcb_opinioes_do_bar` | Links de rota e Uber (13.2) |
 | Cards de entrada (8.5) | `src/features/cards/` | `otcb_opinioes` (a própria) | `otcb_confirmar_bar`, `otcb_sugerir_bar`, `otcb_registrar_card`, insert em `otcb_denuncias`, Edge Function `otcb-opinioes` |
+| T7 Câmera (8.6) | `app/camera.tsx` + `src/features/colarinhometro/` | — | Edge Function `otcb-colarinhometro` |
 | T9 Perfil (mínimo) | `app/perfil.tsx` | — | `delete` em `otcb_mensagens` (próprias) |
 
 ## 5. Lógica por tela, Edge Function e script
@@ -395,6 +405,52 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - `formulario_denuncia` só para opinião vista no turno.
 - O agente continua sem ferramenta que grava. Prompt v5.
 
+### Colarinhômetro: app (8.6)
+- **Câmera (`expo-camera`):**
+  - só a câmera traseira, sem galeria (11.4; hook `guard-gallery` e teste jest);
+  - guia tracejada com a dica 15.15;
+  - permissão negada mostra a explicação e "Abrir ajustes".
+- **Depois da foto:**
+  - `prepararFoto` redimensiona para 1280 px no lado maior, JPEG 0,7;
+  - pergunta "É chopp Brahma?" (Sim / Não / Não sei);
+  - envia com a localização do momento (ou sem ela) e mostra o A4.
+- **Resultado:**
+  - vira uma fala local do app com o bloco `resultado_colarinho`, guardada em `otcb_mensagens_locais` (AsyncStorage, 30 dias) e misturada ao histórico em ordem;
+  - os cards abertos pela Ficha usam o mesmo mecanismo;
+  - "Limpar conversa" apaga essas mensagens também.
+- **Card de resultado:**
+  - A5: a nota sobe e as barrinhas crescem;
+  - A6: o carimbo bate, com tremida, confete âmbar e haptics médio;
+  - motivo quando não sai carimbo (15.8 do carimbo); "sem bar" oferece sugerir o bar com "estou no bar";
+  - "Compartilhar" captura um `ShareCard` fora da tela, só com bar, nota e comentário (`react-native-view-shot` + `expo-sharing`).
+- **Fila offline:** sem rede, o JPEG é copiado para `Documents/otcb-fila` e entra em `otcb_fila_fotos`. A fila é enviada sempre que o chat ganha foco; o que passa de 24 h é descartado.
+- **Telemetria:** `otcb_foto_avaliada` e `otcb_carimbo_ganho`, sem foto nem localização.
+
+### Edge Function `otcb-colarinhometro` (13.5; regras 11.4–11.6)
+- **Entrada:** multipart com `imagem` (JPEG conferido pelos bytes `FF D8 FF`, de até 1 MB, senão 413), `latitude` e `longitude` (opcionais, juntas), `capturada_em` e `confirmou_brahma`.
+- **Ordem:**
+  1. JWT.
+  2. Validação.
+  3. Limite de 10 por dia (429 `limite_fotos`, sem gastar IA).
+  4. Visão (`claude-haiku-5-5`, contrato 13.5, 1 nova tentativa) em paralelo com `otcb_bar_mais_proximo`.
+  5. Nota da 11.5.
+  6. Upload em `{usuario_id}/{foto_id}.jpg`.
+  7. Insert em `otcb_fotos` (o trigger cuida de evidência e carimbo); se o insert falha, o arquivo é removido.
+  8. `otcb_resultado_foto`.
+- **Não é chopp:** a foto é gravada sem nota e devolve 422 `nao_e_chopp` (15.6).
+- **Falha da IA:** 503, sem gravar nada.
+- **Comentário:** até 120 caracteres, cortado no fim de uma palavra com reticências.
+- **Log:** só evento, tempo, `e_chopp`, se teve bar e se saiu carimbo.
+- **Checagem real em 08/11/2026:**
+  - ~100 m com "Sim" → nota 8,6 e carimbo;
+  - ~200 m → sem bar;
+  - "Não sei" → `nao_confirmou`;
+  - ilustração → `nao_e_chopp`;
+  - 3º carimbo do dia → `limite_dia`;
+  - o dono baixa a foto e outra conta não;
+  - tempo de 2,7 a 4,1 s (6,5 s com a função fria);
+  - os dados de teste foram limpos.
+
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
 1. Lê `supabase/seed/estabelecimentos_otcb_antigo.csv`, ignorando linhas sem nome.
@@ -454,4 +510,10 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | `otcb_registrar_card` (8.5) | Função nova para a mensagem `sistema` do card. | O passo 3 da 8.5 manda o app gravar a mensagem `sistema`, mas a 6.1 só deixa o serviço inserir mensagens; a função grava texto fixo do servidor, sem texto livre do cliente. |
 | "Não sei" na sugestão (8.5) | Não cadastra o bar. | Decisão do Alexandre: o OTCB só lista onde tem chopp Brahma. |
 | Opinião × critério 7 (8.5) | Os cards gravam sem o agente. A opinião depende da moderação por IA (11.7) e, sem ela, não publica (15.9). | É a própria regra 11.7. |
+| `pessoa_identificavel` (8.6) | Coluna nova em `otcb_fotos`. | A 13.5 e a seção 28 dizem que é gravada; a 7.2 não a lista. |
+| Foto "não é chopp" (8.6) | É gravada sem nota (e o arquivo também). | Conta no limite de 10 por dia (11.6) e não gera nota nem evidência (critério 4). |
+| Localização opcional na 13.5 (8.6) | Sem coordenadas, a foto é avaliada sem bar. | A seção 17 deixa negar a localização; a nota continua valendo. |
+| A6 sem Lottie (8.6) | Carimbo e confete feitos com o Reanimated. | Mesma decisão da A9. |
+| Selo novo no resultado (8.6) | `otcb_resultado_foto` não diz se saiu selo. | Fica para o Passaporte (8.7), que calcula os selos. |
+| Mensagens locais no aparelho (8.6) | Resultado do Colarinhômetro e cards da Ficha guardados no AsyncStorage por 30 dias. | O bloco de resultado não é gravado em `otcb_mensagens`, porque só o agente grava lá (6.1). |
 | Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |
