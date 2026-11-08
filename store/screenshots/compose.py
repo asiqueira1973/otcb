@@ -24,6 +24,7 @@ STATUS_BAR = 186           # px da barra de status na captura do 17 Pro Max
 # (arquivo, chamada com a palavra em destaque entre colchetes, linha de apoio)
 SLIDES = [
     ("04-jogo.png", "Pergunta. O OTCB [responde.]", "Um assistente com IA que acha o bar certo: perto de você, com balcão ou passando o jogo."),
+    ("06-brasileirao.png", "Jogos do Brasileirão [sempre em dia.]", "Atualizados todo dia, sozinhos. Pergunte pelo seu time e veja onde assistir."),
     ("02-ficha.png", "Tudo do bar em [um toque.]", "Nota do colarinho, opiniões da galera, rota e Uber no mesmo lugar."),
     ("03-passaporte.png", "Seu passaporte de [bares.]", "Carimbos por bar, coleções por bairro e selos por descoberta."),
     ("05-perfil.png", "Sem cadastro. [Sem senha.]", "Só um apelido. E seus dados saem do app com um toque, quando você quiser."),
