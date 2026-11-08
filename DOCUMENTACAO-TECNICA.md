@@ -204,6 +204,13 @@ Colunas novas: `otcb_opinioes.edicoes_dia` e `edicoes_qtd`, que só o serviço g
 
 Coluna nova: `otcb_fotos.pessoa_identificavel` (13.5 e seção 28). O cliente não lê.
 
+### Jogos (épico 8.9; service-only)
+
+| Nome | O que faz |
+|---|---|
+| `otcb_jogos_gravar(dados)` | Upsert por `id_externo`; só regrava o que mudou (remarcação de horário). Apaga os cancelados e adiados. |
+| `otcb_jogos_disparar()` | `net.http_post` para a `otcb-jogos`, com o segredo `x-otcb-cron` do Vault. |
+
 ### Jobs do `pg_cron` (horários em UTC; São Paulo é UTC−3)
 
 | Job | Quando | Chama |
@@ -215,7 +222,7 @@ Coluna nova: `otcb_fotos.pessoa_identificavel` (13.5 e seção 28). O cliente n�
 | `otcb_cron_resumos` | 08:00 UTC (05:00 SP) | `otcb_garimpo_disparar('resumos')` |
 | `otcb_cron_descoberta` | segunda 05:00 UTC (02:00 SP) | `otcb_garimpo_disparar('descoberta')` |
 
-O `otcb_cron_jogos` entra no épico 8.9.
+| `otcb_cron_jogos` | 08:30 UTC (05:30 SP) | `otcb_jogos_disparar()` (8.9) |
 
 ## 4. Mapa tela → tabelas e funções
 
@@ -490,6 +497,34 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - 3 denúncias ocultaram a opinião; o dono continuou vendo e as outras pessoas não;
   - o resumo sumiu com 2 publicadas;
   - os dados foram limpos.
+
+### Edge Function `otcb-jogos` (13.9; épico 8.9)
+- **Chamada:** só pelo `pg_cron`, com o cabeçalho `x-otcb-cron` e `verify_jwt = false`.
+- **Busca:** uma chamada a `GET /v4/matches` do football-data, de hoje a hoje + 7 no dia de SP, com todas as competições do plano gratuito. A P2 foi confirmada: inclui o Brasileirão Série A.
+- **Gravação:**
+  - mandante e visitante pelo nome curto;
+  - competição em português (Brasileirão, Champions League…);
+  - cancelados e adiados são apagados;
+  - partida sem time definido fica de fora.
+- **football-data fora:** responde 502 e mantém os jogos gravados (12.5). O log leva só o status.
+- **Primeira execução real (08/11/2026):** 36 jogos, 2 do Brasileirão.
+
+### Agente: onde ver o jogo (8.9)
+- **`jogos_de_hoje`:** com time, devolve `jogos_do_time` e `outros_jogos`.
+- **Prompt v6:**
+  - procura o jogo do time hoje;
+  - se não tiver, procura nos próximos 7 dias e diz quando é o próximo;
+  - depois `buscar_bares` com `transmite_jogos`;
+  - sem bar que passa jogo, diz isso e oferece "Passa jogo?" (`pergunta_confirmacao`) para 1 a 3 bares com Brahma da região;
+  - converte o horário de UTC para SP e entende apelidos de time (Timão, Verdão…).
+- **Texto de rascunho:** o escrito junto com uma consulta (`buscar_bares`, `jogos_de_hoje`…) não vai para a pessoa (bug achado na checagem real).
+- **Checagem real (08/11/2026),** com um jogo de teste do Corinthians hoje, um do Santos daqui a 3 dias e o Bar do Juarez passando jogo por duas confirmações de teste:
+  - critério 1: jogo e o bar de Pinheiros que passa jogo;
+  - critério 2: "Hoje o Santos não entra em campo. O próximo é…";
+  - critério 3: no Itaim, nenhum bar que passa jogo, com 3 cards "Passa jogo?".
+
+  Os dados de teste foram limpos.
+- **Avaliação:** 20/20, com p95 de 8,2 s (o prompt cresceu; tempo aceito sem rigor pelo Alexandre).
 
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.

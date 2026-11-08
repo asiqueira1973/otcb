@@ -2,7 +2,7 @@ import Anthropic from "npm:@anthropic-ai/sdk@^0";
 
 import { CacheTurno } from "./blocos.ts";
 import { executarFerramenta, FERRAMENTAS, type Turno } from "./ferramentas.ts";
-import { PROMPT_AGENTE_V5 } from "./prompts/agente.v5.ts";
+import { PROMPT_AGENTE_V6 } from "./prompts/agente.v6.ts";
 import type { AgenteDb, Bloco } from "./tipos.ts";
 
 // Loop do agente do chat (seções 4.1, 13.1 e 13.3). Modelo da seção 4.1: claude-sonnet-5-5.
@@ -77,10 +77,11 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
   const messages = montarMensagens(entrada);
   // O prompt fixo e as ferramentas ficam em cache (prefixo estável); o contexto do turno vem depois.
   const system: Anthropic.TextBlockParam[] = [
-    { type: "text", text: PROMPT_AGENTE_V5, cache_control: { type: "ephemeral" } },
+    { type: "text", text: PROMPT_AGENTE_V6, cache_control: { type: "ephemeral" } },
     { type: "text", text: contextoDoTurno(entrada) },
   ];
   const textos: string[] = [];
+  const rascunhos: string[] = [];
   const uso: UsoTurno = { chamadas: 0, cache_lido: 0, cache_gravado: 0, entrada: 0 };
 
   for (let rodada = 0; rodada <= MAX_RODADAS; rodada++) {
@@ -107,8 +108,12 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
     uso.entrada += resposta.usage?.input_tokens ?? 0;
 
     const texto = resposta.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("").trim();
-    if (texto) textos.push(texto);
     const usos = resposta.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+    // Bug real do 8.9: texto escrito junto com uma consulta (buscar_bares, jogos_de_hoje…) é rascunho do modelo
+    // ("Horário UTC 23:30 = 20:30…") e não vai para a pessoa; só vale o texto de rodada sem consulta.
+    const soExibe = usos.every((u) => u.name === "mostrar" || u.name === "oferecer_card");
+    if (texto && soExibe) textos.push(texto);
+    else if (texto) rascunhos.push(texto);
     if (resposta.stop_reason !== "tool_use" || usos.length === 0) break;
 
     messages.push({ role: "assistant", content: resposta.content });
@@ -124,7 +129,8 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
     messages.push({ role: "user", content: resultados });
   }
 
-  const texto = textos.join("\n\n").trim();
+  // Sem texto final: com cards, o handler usa o texto padrão; sem nada, o último rascunho é melhor que vazio.
+  const texto = (textos.join("\n\n") || (turno.blocos.length === 0 ? rascunhos.at(-1) ?? "" : "")).trim();
   if (!texto && turno.blocos.length === 0) throw new IaIndisponivel("resposta_vazia");
   return { texto, blocos: turno.blocos, uso };
 }

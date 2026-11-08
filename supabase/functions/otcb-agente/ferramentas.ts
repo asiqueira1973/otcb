@@ -36,7 +36,7 @@ export const FERRAMENTAS: Anthropic.Tool[] = [
   },
   {
     name: "jogos_de_hoje",
-    description: "Jogos de futebol de hoje ou dos próximos dias (0 a 7), opcionalmente de um time.",
+    description: "Jogos de futebol (horário em UTC) de hoje (dias_a_frente 0) até 7 dias à frente. Com time, separa os jogos_do_time dos outros. Use o nome oficial do time (ex.: Corinthians, Palmeiras, São Paulo, Flamengo).",
     input_schema: { type: "object", properties: { time: { type: "string" }, dias_a_frente: { type: "integer" } } },
   },
   {
@@ -177,9 +177,13 @@ export async function executarFerramenta(nome: string, entrada: Record<string, u
       }
       case "jogos_de_hoje": {
         const dias = Math.min(Math.max(Number(entrada.dias_a_frente ?? 0), 0), 7);
-        const jogos = await db.jogos(typeof entrada.time === "string" ? entrada.time : null, dias);
+        const time = typeof entrada.time === "string" && entrada.time.trim() ? entrada.time.trim() : null;
+        const jogos = await db.jogos(time, dias);
         for (const j of jogos) turno.cache.jogos.set(j.jogo_id, j);
-        return JSON.stringify({ jogos });
+        // 8.9: diz ao modelo quais jogos são do time pedido (os demais vêm só como contexto).
+        const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const doTime = time ? jogos.filter((j) => norm(`${j.mandante} ${j.visitante}`).includes(norm(time))) : [];
+        return JSON.stringify(time ? { time_pedido: time, jogos_do_time: doTime, outros_jogos: jogos.filter((j) => !doTime.includes(j)).slice(0, 10) } : { jogos });
       }
       case "meu_passaporte": {
         const p = await db.meuPassaporte();
