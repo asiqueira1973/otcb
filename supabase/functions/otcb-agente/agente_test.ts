@@ -567,3 +567,14 @@ Deno.test("bug do 8.11: jogos_de_hoje entrega o horário em São Paulo (inicio_s
   assertEquals(resultado.jogos_do_time[0].inicio_sp, "sáb 14/11 20:30");
   assertFalse("inicio" in resultado.jogos_do_time[0]);
 });
+
+// Bug real do 8.11: o Vasco jogava hoje fora do Brasileirão e o agente afirmou "Hoje o Vasco não joga". A base
+// só tem as competições do plano grátis do football-data; a ferramenta diz isso ao modelo para ele não
+// afirmar ausência de jogo.
+Deno.test("bug do 8.11: jogos_de_hoje informa a cobertura (sem Copa do Brasil nem estaduais)", async () => {
+  const { db } = fakeDb();
+  const { modelo, chamadas } = fakeModelo([usoFerramenta("t1", "jogos_de_hoje", { time: "Vasco" }), textoFinal("Não achei.")]);
+  await handleAgente(req({ mensagem: "o Vasco joga hoje?" }), deps(db, modelo));
+  const resultado = JSON.parse((chamadas[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].content as string);
+  assert(/Brasileirão/.test(resultado.cobertura) && /Copa do Brasil/.test(resultado.cobertura) && /estaduais/.test(resultado.cobertura), resultado.cobertura);
+});
