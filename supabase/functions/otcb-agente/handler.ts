@@ -25,6 +25,20 @@ function json(status: number, corpo: unknown): Response {
   return new Response(JSON.stringify(corpo), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
+// Lê o `sub` do JWT sem validar a assinatura, só para adiantar consultas; a identidade vale apenas depois de
+// confirmada pelo Auth (handleAgente). Recebe: token. Devolve: o uuid do sub ou null se não for um JWT legível.
+export function subDoToken(token: string): string | null {
+  try {
+    const parte = token.split(".")[1];
+    if (!parte) return null;
+    const json = atob(parte.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(parte.length / 4) * 4, "="));
+    const sub = JSON.parse(json).sub;
+    return typeof sub === "string" && /^[0-9a-f-]{36}$/i.test(sub) ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
 // Valida o corpo da 13.1. Recebe: JSON. Devolve: mensagem e localização, ou null se inválido (422).
 export function validarEntrada(corpo: unknown): { mensagem: string; local: { latitude: number; longitude: number } | null } | null {
   if (!corpo || typeof corpo !== "object") return null;
@@ -54,17 +68,25 @@ export async function handleAgente(req: Request, deps: DepsAgente): Promise<Resp
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
   if (!token) return json(401, { codigo: "nao_autenticado" });
   const db = deps.db(token);
-  const usuarioId = await db.usuarioDoToken(token).catch(() => null);
-  if (!usuarioId) return json(401, { codigo: "nao_autenticado" });
+  // Critério 8: a validação no Auth corre em paralelo com a leitura do corpo e as consultas do turno, que
+  // começam pelo `sub` do JWT; nada é usado nem gravado antes de o Auth confirmar o mesmo usuário.
+  const verificacao = db.usuarioDoToken(token).catch(() => null);
+  const sub = subDoToken(token);
 
   let corpo: unknown;
   try { corpo = await req.json(); } catch { corpo = null; }
   const entrada = validarEntrada(corpo);
+  const guardrail = entrada ? verificarGuardrail(entrada.mensagem) : null;
+  const consultar = (id: string) => Promise.all([db.mensagensHoje(id), db.contexto(id), db.perfil(id)]);
+  const adiantadas = entrada && !guardrail && sub ? consultar(sub) : null;
+  adiantadas?.catch(() => undefined); // evita rejeição sem tratamento se o token não valer
+
+  const usuarioId = await verificacao;
+  if (!usuarioId || (sub !== null && sub !== usuarioId)) return json(401, { codigo: "nao_autenticado" });
   if (!entrada) return json(422, { codigo: "mensagem_invalida" });
 
   try {
     // 11.18: filtro determinístico antes de tudo; o modelo não é chamado. Só o tipo vai ao log.
-    const guardrail = verificarGuardrail(entrada.mensagem);
     if (guardrail) {
       deps.log({ evento: "guardrail", tipo: guardrail.tipo });
       if (guardrail.tipo === "menor") await db.marcarRevisaoMenor(usuarioId);
@@ -76,7 +98,7 @@ export async function handleAgente(req: Request, deps: DepsAgente): Promise<Resp
     }
 
     // Limite, contexto e perfil em paralelo (critério 8: cada ida ao banco soma na latência).
-    const [hoje, historico, perfil] = await Promise.all([db.mensagensHoje(usuarioId), db.contexto(usuarioId), db.perfil(usuarioId)]);
+    const [hoje, historico, perfil] = await (adiantadas ?? consultar(usuarioId));
     // 11.6: a 41ª mensagem do dia não chega ao modelo nem é gravada.
     if (hoje >= LIMITE_DIARIO) {
       deps.log({ evento: "limite_mensagens" });

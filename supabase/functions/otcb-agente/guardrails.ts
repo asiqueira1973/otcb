@@ -7,7 +7,8 @@ export type TipoGuardrail = "menor" | "dirigir" | "quantidade" | "compra";
 
 const PADROES: Record<TipoGuardrail, RegExp[]> = {
   menor: [
-    /\btenho ([0-9]|1[0-7])( anos)?\b/,
+    // "tenho N anos", ou "tenho N" no fim da frase; "tenho 3 amigos" não é idade (bug B1 do verifier).
+    /\btenho ([0-9]|1[0-7])( anos\b|\s*([.,!?]|$))/,
     /\bsou menor\b/,
     /\bmenor de idade\b/,
     /\b([0-9]|1[0-7]) anos (de idade )?(e )?(quero|posso|da pra)\b/,
@@ -23,14 +24,18 @@ const PADROES: Record<TipoGuardrail, RegExp[]> = {
     /\bquantos? chop+s?\b.*\b(bebad|chapad|ficar louco|derrubar)/,
     /\bficar bebad/,
     /\bvirar (o|um|uns|dois|tres|quatro|cinco|[0-9]+)?\s*(chop+|copo|caneco|tulipa|cerveja)/,
-    /\bdesafio\b/,
+    // "desafio" só com bebida por perto ("desafio de hoje no futebol" passa).
+    /\bdesafio\b.*\b(chop+s?|cervejas?|beber|bebe|copos?|vira|virar)\b/,
+    /\b(chop+s?|cervejas?|beber|copos?)\b.*\bdesafio\b/,
     /\bporre\b/,
     /\bencher a cara\b/,
   ],
   compra: [
     /\b(delivery|ifood|rappi|ze delivery)\b/,
-    /\b(comprar|compro|vende|vendem|vender|entrega|entregam|entregar)\b.*\b(chop+|cerveja|bebida|barril|brahma)\b/,
-    /\b(chop+|cerveja|bebida|barril|brahma)\b.*\b(em casa|delivery|pra entregar|entrega)\b/,
+    // Comprar bebida, ou pedir que o OTCB venda/entregue. "O bar vende chopp Brahma?" é a pergunta do app (B1).
+    /\b(comprar|compro|compra)\b.*\b(chop+|cerveja|bebida|barril|brahma)\b/,
+    /\b(voces|vcs|voce|vc|o app|otcb)\b.*\b(vende|vendem|vender|entrega|entregam|entregar)\b/,
+    /\b(chop+|cerveja|bebida|barril)\b.*\b(em casa|pra levar|para levar|pra entregar)\b/,
   ],
 };
 

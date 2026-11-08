@@ -300,7 +300,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 ### T5 Chat (`useChat`, épico 8.4)
 - Ao abrir e a cada volta à tela, carrega o histórico próprio (`usuario` e `assistente`, até 300). Sem rede, mantém o que já está na tela.
 - **Envio:**
-  - pega a localização só se a permissão de primeiro plano já existe (última posição conhecida de até 2 min, senão GPS com teto de 4 s), sem pedir de novo;
+  - pega a localização só se a permissão de primeiro plano já existe (última posição conhecida de até 2 min, senão GPS com teto de 2,5 s), sem pedir de novo;
   - chama `otcb-agente` com o JWT;
   - mostra o A1 enquanto espera.
 - **Erros:**
@@ -324,8 +324,8 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Saída:** `{mensagem_id, texto, blocos, bloqueada_guardrail}`.
 - **Erros:** 401, 422, 429 `limite_mensagens` (com `texto` 15.8) e 503 `ia_indisponivel` (com `texto` 15.9). No 503 nada é gravado.
 - **Ordem:**
-  1. **Guardrail 11.18** (`guardrails.ts`): regex sem acento, na ordem menor → dirigir → quantidade → compra. Responde o texto fixo da 15.11 e não chama o modelo. O log leva só `{evento:'guardrail', tipo}`; "menor" também marca `revisao_menor_em`.
-  2. **Limite, contexto e perfil**, consultados em paralelo. Com 40 mensagens no dia → 429.
+  1. **Guardrail 11.18** (`guardrails.ts`): regex sem acento, na ordem menor → dirigir → quantidade → compra. "Tenho N" só conta como idade com "anos" ou no fim da frase; "compra" exige comprar, pedir que o OTCB venda ou entregue, ou levar para casa ("o bar vende chopp Brahma?" passa); "desafio" só com bebida. Responde o texto fixo da 15.11 e não chama o modelo. O log leva só `{evento:'guardrail', tipo}`; "menor" também marca `revisao_menor_em`.
+  2. **Limite, contexto e perfil**, consultados em paralelo e adiantados pelo `sub` do JWT enquanto o Auth valida o token. Nada é usado antes da confirmação; `sub` diferente do usuário confirmado → 401. Com 40 mensagens no dia → 429.
   3. **Modelo** `claude-sonnet-5-5`, com esforço `low`:
      - o prompt fixo `prompts/agente.v2.ts` e as ferramentas ficam em cache; o contexto do turno (apelido, time, localização e hora de SP) vem num bloco de sistema separado;
      - no máximo 5 rodadas de ferramenta; a 6ª chamada usa `tool_choice: none`;
@@ -334,12 +334,13 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - `buscar_bares`, `detalhes_bar` e `meu_passaporte` rodam com o JWT do usuário; `opinioes_do_bar` e `jogos_de_hoje` também.
   - Sem texto e sem bairro, `buscar_bares` usa a localização do turno; sem localização, devolve `sem_localizacao` para o modelo pedir o bairro.
   - Status fora de confirmado/provavel/incerto são descartados antes de chegar ao modelo, e `incerto` chega como `a_confirmar`.
-- **`mostrar`:** recebe ids. O servidor monta o `CardBar` a partir do cache do turno e descarta bloco inválido ou com bar inventado.
+- **`mostrar`:** recebe ids. O servidor monta o `CardBar` a partir do cache do turno, ordena `lista_bares` e `mapa` pela 11.9 (status, depois distância) e descarta bloco inválido ou com bar inventado.
 - **Grava** a mensagem do usuário e a resposta (com blocos) com instantes crescentes. A localização nunca é gravada.
 - **Log:** `{evento:'resposta', ms, blocos, chamadas, cache_lido, cache_gravado, entrada}`, só números.
 - **Avaliação:**
   - `avaliacao.json` tem 20 perguntas com o esperado de cada uma, e `npm run agente:avaliar [-- --repetir N]` roda contra o BANCO DE TESTE com um usuário descartável;
-  - resultado em 08/11/2026: 40/40, p50 5,4 s, p95 7,3 s (Wi-Fi, 34 respostas do modelo).
+  - o script faz uma chamada de aquecimento fora da conta;
+  - resultado final em 08/11/2026: 40/40, p50 5,2 s, p95 6,9 s (Wi-Fi, 34 respostas do modelo, função aquecida). Não foi medido em 4G.
 
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
@@ -392,4 +393,5 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Encerrar no `mostrar` com texto e prompt v2 (8.4) | Otimização do loop da 13.1. | O p95 estava em 8,7 s; o critério 8 pede menos de 8 s. O `claude-sonnet-5-5` recusa thinking desligado. |
 | "Chopp Brahma" nos textos (8.4) | 15.1 "Onde tem chopp Brahma bem tirado?", 15.3 "Pra achar o chopp Brahma mais perto…", 15.4 "Chopp Brahma perto de mim", 15.13 "Pergunta onde tem chopp Brahma…". | Emenda do Alexandre: o app é só sobre chopp Brahma. A loja (15.10) continua sem a palavra. |
 | Perfil mínimo e "em breve" (8.4) | T9 só com "Limpar conversa", aviso 15.20 e rodapé 15.12; câmera e Passaporte mostram "em breve". | O resto entra no 8.10, 8.6 e 8.7. |
+| Prompt do agente em `.ts` | O plano dizia `prompts/agente.v1.md`. | O bundle da Edge Function não lê arquivos `.md` sem configuração extra; a regra de versionamento vale igual (`agente.vN.ts`). |
 | Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |

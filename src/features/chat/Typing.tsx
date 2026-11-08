@@ -17,10 +17,11 @@ function Bubble({ delay, left }: { delay: number; left: number }) {
   const reduceMotion = useReducedMotion();
   const y = useSharedValue(0);
   useEffect(() => {
-    y.value = withDelay(delay, withRepeat(withTiming(1, { duration: reduceMotion ? 1200 : 900 }), -1, false));
+    // "Reduzir movimento" (16.6): sem loop; as bolhas só aparecem com opacidade em 200 ms.
+    y.value = reduceMotion ? withTiming(1, { duration: 200 }) : withDelay(delay, withRepeat(withTiming(1, { duration: 900 }), -1, false));
   }, [delay, reduceMotion, y]);
   const style = useAnimatedStyle(() =>
-    reduceMotion ? { opacity: 0.4 + 0.6 * y.value } : { opacity: 1 - y.value * 0.7, transform: [{ translateY: -y.value * 26 }] },
+    reduceMotion ? { opacity: y.value } : { opacity: 1 - y.value * 0.7, transform: [{ translateY: -y.value * 26 }] },
   );
   return <Animated.View style={[styles.bubble, { left }, style]} />;
 }

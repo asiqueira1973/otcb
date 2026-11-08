@@ -4,7 +4,7 @@ export type Coords = { latitude: number; longitude: number };
 
 // Localização só na hora da pergunta (seção 17; 15.3): usa a permissão de primeiro plano já dada no
 // onboarding, sem pedir de novo nem rastrear. Recebe: nada. Devolve: coordenadas ou null (sem permissão,
-// GPS desligado ou demora > 4 s — a pergunta vai sem coordenadas).
+// GPS desligado ou demora > 2,5 s (critério 8) — a pergunta vai sem coordenadas).
 export async function getCurrentCoords(): Promise<Coords | null> {
   try {
     const { status } = await Location.getForegroundPermissionsAsync();
@@ -13,7 +13,7 @@ export async function getCurrentCoords(): Promise<Coords | null> {
     if (last) return { latitude: last.coords.latitude, longitude: last.coords.longitude };
     const pos = await Promise.race([
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
     ]);
     return pos ? { latitude: pos.coords.latitude, longitude: pos.coords.longitude } : null;
   } catch {

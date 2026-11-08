@@ -41,17 +41,17 @@ export async function sendToAgent(mensagem: string, coords: Coords | null): Prom
   }
 }
 
-// Histórico do chat (T5; 11.14: o banco guarda 30 dias). Recebe: nada. Devolve: mensagens em ordem
-// cronológica, sem as de papel 'sistema'. Offline lança, e a tela segue com o que já tinha (seção 17).
+// Histórico do chat (T5; 11.14: o banco guarda 30 dias). Busca as 300 mais recentes (bug B3 do verifier) e
+// devolve em ordem cronológica, sem as de papel 'sistema'. Offline lança, e a tela segue com o que tinha (17).
 export async function loadHistory(): Promise<ChatMessage[]> {
   const { data, error } = await supabase
     .from('otcb_mensagens')
     .select('id, papel, conteudo, blocos, criado_em')
     .in('papel', ['usuario', 'assistente'])
-    .order('criado_em', { ascending: true })
+    .order('criado_em', { ascending: false })
     .limit(300);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((m) => ({
+  return [...(data ?? [])].reverse().map((m) => ({
     id: m.id,
     papel: m.papel as ChatMessage['papel'],
     conteudo: m.conteudo,

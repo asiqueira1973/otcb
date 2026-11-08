@@ -309,3 +309,35 @@ Deno.test("B2 (critério 1): lista_bares e mapa saem na ordem da 11.9 (status, d
   assertEquals((blocos[0] as { bares: { bar_id: string }[] }).bares.map((b) => b.bar_id), esperado);
   assertEquals((blocos[1] as { pontos: { bar_id: string }[] }).pontos.map((b) => b.bar_id), esperado);
 });
+
+// ===================================================================== consultas adiantadas pelo sub (critério 8)
+
+const jwtCom = (sub: string) => `x.${btoa(JSON.stringify({ sub })).replace(/=+$/, "")}.y`;
+
+Deno.test("critério 8: consultas começam pelo sub do JWT, mas sub diferente do usuário confirmado pelo Auth → 401 sem modelo nem gravação", async () => {
+  const { db, estado } = fakeDb();
+  const sub = "11111111-1111-1111-1111-111111111111";
+  const outro = "22222222-2222-2222-2222-222222222222";
+  const consultados: string[] = [];
+  db.mensagensHoje = (id) => { consultados.push(id); return Promise.resolve(0); };
+  db.usuarioDoToken = () => Promise.resolve(outro);
+  const { modelo, chamadas } = fakeModelo([textoFinal("x")]);
+  const res = await handleAgente(req({ mensagem: "oi" }, jwtCom(sub)), deps(db, modelo));
+  assertEquals(res.status, 401);
+  assertEquals(chamadas.length, 0);
+  assertEquals(estado.gravadas.length, 0);
+  assertEquals(consultados, [sub]);
+});
+
+Deno.test("critério 8: com o sub confirmado, o turno usa as consultas adiantadas", async () => {
+  const { db, estado } = fakeDb();
+  const sub = "11111111-1111-1111-1111-111111111111";
+  let consultas = 0;
+  db.mensagensHoje = () => { consultas += 1; return Promise.resolve(0); };
+  db.usuarioDoToken = () => Promise.resolve(sub);
+  const { modelo } = fakeModelo([textoFinal("Opa.")]);
+  const res = await handleAgente(req({ mensagem: "oi" }, jwtCom(sub)), deps(db, modelo));
+  assertEquals(res.status, 200);
+  assertEquals(consultas, 1);
+  assertEquals(estado.gravadas.length, 2);
+});

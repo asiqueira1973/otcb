@@ -60,6 +60,16 @@ export function montarBlocos(pedidos: unknown, cache: CacheTurno): { blocos: Blo
   return { blocos, descartados };
 }
 
+const ORDEM_STATUS: Record<StatusVisivel, number> = { confirmado: 0, provavel: 1, incerto: 2 };
+
+// Ordem da regra 11.9: status (confirmado, provável, incerto) e depois distância; sem distância vai por último.
+// O modelo escolhe quais bares mostrar, mas não a ordem (critério 1; bug B2 do verifier).
+function ordenar119(bares: CardBar[]): CardBar[] {
+  return [...bares].sort((a, b) =>
+    ORDEM_STATUS[a.status] - ORDEM_STATUS[b.status]
+    || (a.distancia_metros ?? Number.MAX_SAFE_INTEGER) - (b.distancia_metros ?? Number.MAX_SAFE_INTEGER));
+}
+
 function idsVisiveis(ids: unknown, cache: CacheTurno): CardBar[] {
   if (!Array.isArray(ids)) return [];
   const vistos = new Set<string>();
@@ -68,7 +78,7 @@ function idsVisiveis(ids: unknown, cache: CacheTurno): CardBar[] {
     const bar = cache.bares.get(String(id));
     if (bar && !vistos.has(bar.bar_id)) { vistos.add(bar.bar_id); out.push(bar); }
   }
-  return out;
+  return ordenar119(out);
 }
 
 function montarBloco(p: Record<string, unknown>, cache: CacheTurno): Bloco | null {

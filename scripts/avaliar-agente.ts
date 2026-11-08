@@ -67,6 +67,12 @@ async function main() {
   const tempos: number[] = [];
   let passou = 0;
   try {
+    // Aquecimento fora da conta: tira a partida a frio da função (logo após deploy). Frase do guardrail, sem modelo.
+    await fetch(`${url}/functions/v1/otcb-agente`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, apikey: anon, "Content-Type": "application/json" },
+      body: JSON.stringify({ mensagem: "vou dirigir depois" }),
+    });
     for (let r = 0; r < repetir; r++) {
       for (const p of arquivo.perguntas) {
         await supa.from("otcb_mensagens").delete().eq("usuario_id", uid); // critério 7: cada pergunta sem contexto
