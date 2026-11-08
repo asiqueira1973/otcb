@@ -30,6 +30,15 @@
           "isAndroidBackgroundLocationEnabled": false,
           "isIosBackgroundLocationEnabled": false
         }
+      ],
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "A câmera é usada só para fotografar o chopp e avaliar o colarinho.",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "platforms": [

@@ -58,7 +58,7 @@ export function MessageRow({ message, animate, onRetry }: Props) {
             <Text style={[styles.text, { color: theme.text }]}>{message.conteudo.replace(/\*\*(.+?)\*\*/g, '$1')}</Text>
           </View>
         ) : null}
-        {message.blocos.length > 0 ? <Blocks blocos={message.blocos} messageId={message.id} /> : null}
+        {message.blocos.length > 0 ? <Blocks blocos={message.blocos} messageId={message.id} animar={animate} /> : null}
       </View>
     </Entering>
   );

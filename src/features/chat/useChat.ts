@@ -4,6 +4,7 @@ import { copy } from '../../lib/copy';
 import { getCurrentCoords } from '../../lib/location';
 import { track } from '../../lib/telemetry';
 import { loadHistory, sendToAgent } from './api';
+import { guardarLocal, juntar, lerLocais } from './localMessages';
 import type { Bloco, BlocoEntrada, ChatMessage } from './types';
 
 let localSeq = 0;
@@ -38,8 +39,8 @@ export function useChat() {
   // Recarrega do banco; offline mantém o que já está na tela (seção 17: histórico legível).
   const reload = useCallback(async () => {
     try {
-      const history = await loadHistory();
-      setMessages(history);
+      const [history, locais] = await Promise.all([loadHistory(), lerLocais()]);
+      setMessages(juntar(history, locais));
     } catch {
       // sem rede: segue com o que tinha
     } finally {
@@ -107,8 +108,15 @@ export function useChat() {
   // Card aberto pela Ficha (T6: "Dar opinião", "Tem Brahma?", "Denunciar"): entra no chat como fala
   // local do app, sem chamar o agente (8.5). Recebe: o bloco de entrada.
   const addLocalCard = useCallback((bloco: BlocoEntrada) => {
-    setMessages((all) => [...all, { id: localId('card'), papel: 'assistente', conteudo: '', blocos: [bloco], criado_em: new Date().toISOString() }]);
+    const m: ChatMessage = { id: localId('card'), papel: 'assistente', conteudo: '', blocos: [bloco], criado_em: new Date().toISOString() };
+    void guardarLocal(m);
+    setMessages((all) => [...all, m]);
   }, []);
 
-  return { messages, typing, loaded, send, retry, reload, addLocalCard };
+  // Resultado do Colarinhômetro chegando da Câmera ou da fila offline (8.6): entra no fim do chat.
+  const addLocalMessage = useCallback((m: ChatMessage) => {
+    setMessages((all) => (all.some((x) => x.id === m.id) ? all : [...all, m]));
+  }, []);
+
+  return { messages, typing, loaded, send, retry, reload, addLocalCard, addLocalMessage };
 }

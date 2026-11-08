@@ -13,6 +13,7 @@ jest.mock('react-native-reanimated', () => {
     withSpring: (value: number) => value,
     withDelay: (_delay: number, value: number) => value,
     withRepeat: (value: number) => value,
+    withSequence: (...values: number[]) => values[values.length - 1],
     useReducedMotion: () => false,
   };
 });
@@ -43,3 +44,41 @@ jest.mock('react-native-maps', () => {
   const Marker = (props: { title?: string }) => require('react').createElement(View, { ...props, accessibilityLabel: props.title });
   return { __esModule: true, default: MapView, Marker };
 });
+
+// Módulos nativos do Colarinhômetro (8.6): câmera, manipulação de imagem, arquivos, compartilhar e captura.
+jest.mock('expo-camera', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const CameraView = React.forwardRef((props: object, ref: unknown) => {
+    React.useImperativeHandle(ref, () => ({
+      takePictureAsync: () => Promise.resolve({ uri: 'file:///foto.jpg', width: 3024, height: 4032 }),
+    }));
+    return React.createElement(View, props);
+  });
+  return {
+    CameraView,
+    useCameraPermissions: jest.fn(() => [{ granted: true, canAskAgain: true }, jest.fn()]),
+  };
+});
+jest.mock('expo-image-manipulator', () => ({
+  manipulateAsync: jest.fn(() => Promise.resolve({ uri: 'file:///foto-1280.jpg', width: 960, height: 1280 })),
+  SaveFormat: { JPEG: 'jpeg' },
+}));
+jest.mock('expo-file-system', () => {
+  class Directory {
+    uri: string;
+    exists = true;
+    constructor(...partes: unknown[]) { this.uri = partes.map((p) => (typeof p === 'string' ? p : (p as { uri: string }).uri)).join('/'); }
+    create() {}
+  }
+  class File {
+    uri: string;
+    exists = true;
+    constructor(...partes: unknown[]) { this.uri = partes.map((p) => (typeof p === 'string' ? p : (p as { uri: string }).uri)).join('/'); }
+    copy() {}
+    delete() {}
+  }
+  return { Directory, File, Paths: { document: { uri: 'file:///docs' }, cache: { uri: 'file:///cache' } } };
+});
+jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(() => Promise.resolve(true)), shareAsync: jest.fn(() => Promise.resolve()) }));
+jest.mock('react-native-view-shot', () => ({ captureRef: jest.fn(() => Promise.resolve('file:///share.png')) }));

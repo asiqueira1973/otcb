@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
@@ -12,10 +13,11 @@ import { ConfirmationCard } from '../cards/ConfirmationCard';
 import { OpinionForm } from '../cards/OpinionForm';
 import { ReportForm } from '../cards/ReportForm';
 import { SuggestionForm } from '../cards/SuggestionForm';
+import { ResultCard } from '../colarinhometro/ResultCard';
 import { showComingSoon } from './comingSoon';
 import type { Bloco, CardBar } from './types';
 
-type Props = { blocos: Bloco[]; messageId?: string };
+type Props = { blocos: Bloco[]; messageId?: string; animar?: boolean };
 
 // Bares conhecidos na mensagem (para as ações rota/Uber/ficha acharem as coordenadas). Recebe: blocos. Devolve: mapa id→bar.
 function knownBars(blocos: Bloco[]): Map<string, Pick<CardBar, 'bar_id' | 'nome' | 'latitude' | 'longitude'>> {
@@ -31,9 +33,9 @@ function knownBars(blocos: Bloco[]): Map<string, Pick<CardBar, 'bar_id' | 'nome'
 // Renderiza os blocos da 13.2 numa resposta: os de exibição (8.4) e os de entrada (8.5), cada card de
 // entrada com chave própria (mensagem + posição) para guardar o estado "registrado". Tipo desconhecido é
 // ignorado. Recebe: blocos e id da mensagem. Devolve: a pilha de cards.
-export function Blocks({ blocos, messageId = "local" }: Props) {
+export function Blocks({ blocos, messageId = "local", animar = false }: Props) {
   const theme = useTheme();
-  const { openBar } = useBarSheet();
+  const { openBar, onCard } = useBarSheet();
   const bars = knownBars(blocos);
   const acoes = blocos.filter((b): b is Extract<Bloco, { tipo: 'acao' }> => b.tipo === 'acao');
 
@@ -42,6 +44,7 @@ export function Blocks({ blocos, messageId = "local" }: Props) {
     if (a.acao === 'abrir_ficha' && a.bar_id) openBar(a.bar_id);
     else if (a.acao === 'abrir_rota' && bar) void openDirections('mapas', bar);
     else if (a.acao === 'chamar_uber' && bar) void openDirections('uber', bar);
+    else if (a.acao === 'abrir_camera') router.push('/camera');
     else showComingSoon();
   }
 
@@ -95,6 +98,8 @@ export function Blocks({ blocos, messageId = "local" }: Props) {
             return <SuggestionForm key={i} chave={`${messageId}:${i}`} nome={b.nome} endereco={b.endereco} bairro={b.bairro} usarLocalizacaoAtual={b.usar_localizacao_atual} />;
           case 'formulario_denuncia':
             return <ReportForm key={i} chave={`${messageId}:${i}`} opiniaoId={b.opiniao_id} />;
+          case 'resultado_colarinho':
+            return <ResultCard key={i} bloco={b} animar={animar} onCard={onCard} />;
           default:
             return null;
         }

@@ -35,9 +35,18 @@ export type BlocoEntrada =
   | { tipo: 'formulario_sugestao_bar'; nome: string | null; endereco: string | null; bairro: string | null; usar_localizacao_atual: boolean }
   | { tipo: 'formulario_denuncia'; opiniao_id: string };
 
-// Blocos de exibição (8.4) e de entrada (8.5); resultado_colarinho chega no 8.6.
+// Resultado do Colarinhômetro (13.2; 8.6). motivo_sem_carimbo é o código da otcb_resultado_foto.
+export type ResultadoColarinho = {
+  tipo: 'resultado_colarinho'; foto_id: string; nome_bar: string | null; nota_colarinho: number;
+  nota_altura: number; nota_cremosidade: number; nota_copo: number; nota_gelado: number;
+  comentario_ia: string | null; carimbo_novo: boolean;
+  motivo_sem_carimbo: 'sem_bar' | 'nao_confirmou' | 'ja_tinha' | 'limite_dia' | null;
+};
+
+// Blocos de exibição (8.4), de entrada (8.5) e o resultado do Colarinhômetro (8.6).
 export type Bloco =
   | BlocoEntrada
+  | ResultadoColarinho
   | { tipo: 'lista_bares'; titulo: string; bares: CardBar[] }
   | { tipo: 'card_bar'; bar: CardBar }
   | { tipo: 'mapa'; pontos: Pick<CardBar, 'bar_id' | 'nome' | 'latitude' | 'longitude' | 'status'>[] }

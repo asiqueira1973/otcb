@@ -15,10 +15,10 @@ import { formatDistance, formatScore, formatShortDate } from './format';
 import { openDirections } from './links';
 import { StatusPill, TagPill } from './Pill';
 
-type SheetApi = { openBar: (bar: CardBar | string) => void };
+type SheetApi = { openBar: (bar: CardBar | string) => void; onCard?: (b: BlocoEntrada) => void };
 const SheetContext = createContext<SheetApi>({ openBar: () => undefined });
 
-// Abre a Ficha de qualquer card do chat. Devolve: { openBar } (aceita o CardBar ou só o id).
+// Abre a Ficha de qualquer card do chat e põe cards de entrada no chat. Devolve: { openBar, onCard }.
 export function useBarSheet(): SheetApi {
   return useContext(SheetContext);
 }
@@ -47,7 +47,7 @@ export function BarSheetProvider({ children, onCard }: { children: ReactNode; on
     }
   }, []);
 
-  const api = useMemo(() => ({ openBar }), [openBar]);
+  const api = useMemo(() => ({ openBar, onCard }), [openBar, onCard]);
   return (
     <SheetContext.Provider value={api}>
       {children}

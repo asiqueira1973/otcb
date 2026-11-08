@@ -7,6 +7,8 @@ import { Mascot } from '../src/components/Mascot';
 import { fonts, useTheme } from '../src/components/theme';
 import { BarSheetProvider } from '../src/features/bares/BarSheet';
 import { showComingSoon } from '../src/features/chat/comingSoon';
+import { enviarFila } from '../src/features/colarinhometro/enviar';
+import { ouvirResultados } from '../src/features/colarinhometro/resultados';
 import { MessageRow } from '../src/features/chat/MessageRow';
 import { TypingIndicator } from '../src/features/chat/Typing';
 import { useChat } from '../src/features/chat/useChat';
@@ -17,18 +19,21 @@ import { copy } from '../src/lib/copy';
 // Passaporte (8.7) e Perfil. Recebe: nada. Devolve: a tela.
 export default function Chat() {
   const theme = useTheme();
-  const { messages, typing, loaded, send, retry, reload, addLocalCard } = useChat();
+  const { messages, typing, loaded, send, retry, reload, addLocalCard, addLocalMessage } = useChat();
   const [text, setText] = useState('');
   const list = useRef<FlatList>(null);
   // Mensagens que já estavam na tela ao carregar não animam; só as novas entram com A2.
   const initialIds = useRef<Set<string> | null>(null);
 
   // Recarrega ao voltar para a tela (ex.: depois de "Limpar conversa" no Perfil).
+  // Na volta à tela também recebe resultados do Colarinhômetro e envia a fila offline de fotos (8.6).
   useFocusEffect(
     useCallback(() => {
       initialIds.current = null;
-      void reload();
-    }, [reload]),
+      ouvirResultados(addLocalMessage);
+      void reload().then(() => enviarFila());
+      return () => ouvirResultados(null);
+    }, [reload, addLocalMessage]),
   );
   useEffect(() => {
     if (loaded && initialIds.current === null) initialIds.current = new Set(messages.map((m) => m.id));
@@ -96,7 +101,7 @@ export default function Chat() {
               testID="botao-camera"
               accessibilityRole="button"
               accessibilityLabel={copy.chat.camera}
-              onPress={showComingSoon}
+              onPress={() => router.push('/camera')}
               style={[styles.round, styles.camera, { backgroundColor: theme.card, borderColor: theme.primary }]}
             >
               <Text style={styles.roundIcon}>📷</Text>

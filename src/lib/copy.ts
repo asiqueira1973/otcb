@@ -144,6 +144,39 @@ export const copy = {
     alreadyReported: 'Você já denunciou essa opinião.', // (proposto 8.5)
     cantReportOwn: 'Essa opinião é sua.', // (proposto 8.5)
   },
+  // Colarinhômetro (8.6)
+  colarinho: {
+    // 15.15
+    hint: 'Copo no meio, colarinho à vista',
+    // 15.6
+    notChopp: 'Hmm, isso não parece um chopp. Tenta de novo com o copo bem no meio da foto.',
+    // 15.8 — carimbo
+    stampLimit: 'Já foram 2 carimbos hoje. A nota ficou registrada; o carimbo deste bar te espera outro dia.',
+    takePhoto: 'Tirar foto', // (proposto 8.6)
+    close: 'Fechar', // (proposto 8.6)
+    retake: 'Tirar outra', // (proposto 8.6)
+    question: 'É chopp Brahma?', // passo 3 da 8.6
+    yes: 'Sim',
+    no: 'Não',
+    dontKnow: 'Não sei',
+    sending: 'Medindo o colarinho…', // (proposto 8.6)
+    permissionTitle: 'Libera a câmera?', // (proposto 8.6)
+    permissionText: 'A câmera é usada só pra fotografar o chopp e dar nota pro colarinho.', // (proposto 8.6)
+    allow: 'Permitir', // (proposto 8.6)
+    openSettings: 'Abrir ajustes', // (proposto 8.6)
+    title: 'Colarinhômetro', // (proposto 8.6)
+    partials: { altura: 'Altura', cremosidade: 'Cremosidade', copo: 'Copo', gelado: 'Gelado' }, // 11.5
+    score: (n: string) => `Nota ${n}`, // (proposto 8.6) leitor de tela
+    newStamp: 'Carimbo novo no Passaporte!', // (proposto 8.6)
+    noBar: 'Não achei bar por perto, então ficou sem carimbo. Conhece esse lugar?', // (proposto 8.6)
+    suggestBar: 'Sugerir este bar', // (proposto 8.6)
+    notConfirmed: 'Sem confirmar Brahma, sem carimbo. A nota tá valendo!', // (proposto 8.6)
+    alreadyStamped: 'Você já tem o carimbo deste bar.', // (proposto 8.6)
+    share: 'Compartilhar', // passo 6 da 8.6
+    photoLimit: 'Por hoje já foram 10 fotos. Amanhã tem mais.', // (proposto 8.6)
+    queued: 'Sem sinal: a foto ficou guardada e vai assim que a rede voltar.', // (proposto 8.6)
+    tooBig: 'A foto ficou grande demais. Tenta de novo.', // (proposto 8.6)
+  },
   // Nomes dos selos da regra 11.11 (proposto 8.4)
   seals: {
     primeira_tirada: 'Primeira tirada',

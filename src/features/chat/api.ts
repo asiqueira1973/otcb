@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import type { Coords } from '../../lib/location';
+import { limparLocais } from './localMessages';
 import type { Bloco, ChatMessage } from './types';
 
 // Acesso do chat ao backend (seção 13.1 e 6.1). Mensagens só são gravadas pela Edge Function;
@@ -66,5 +67,6 @@ export async function clearConversation(): Promise<boolean> {
   const uid = data.user?.id;
   if (!uid) return false;
   const { error } = await supabase.from('otcb_mensagens').delete().eq('usuario_id', uid);
+  if (!error) await limparLocais();
   return !error;
 }

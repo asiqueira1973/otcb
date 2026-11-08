@@ -139,9 +139,12 @@ describe('T5 Chat', () => {
     await waitFor(() => expect(screen.queryByTestId('digitando')).toBeNull());
   });
 
-  it('câmera e Passaporte avisam "em breve"; Perfil abre a tela', async () => {
+  // 8.6: a câmera deixou de ser "em breve" e abre o Colarinhômetro; o Passaporte segue "em breve" até o 8.7.
+  it('câmera abre o Colarinhômetro; Passaporte avisa "em breve"; Perfil abre a tela', async () => {
     await renderWithSafeArea(<Chat />);
     await fireEvent.press(screen.getByTestId('botao-camera'));
+    expect(mockPush).toHaveBeenCalledWith('/camera');
+    await fireEvent.press(screen.getByTestId('atalho-passaporte'));
     expect(Alert.alert).toHaveBeenCalledWith(copy.chat.comingSoonTitle, copy.chat.comingSoon);
     await fireEvent.press(screen.getByTestId('atalho-perfil'));
     expect(mockPush).toHaveBeenCalledWith('/perfil');
