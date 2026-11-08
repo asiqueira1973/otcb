@@ -303,6 +303,9 @@ isOneToOne: false
 "otcb_e_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
+"otcb_fotos_hoje":
+{ Args: { "p_usuario": string }; Returns: number
+                           },
 "otcb_garimpo_disparar":
 { Args: { "p_execucao_id"?: string,"p_modo": string }; Returns: number
                            },
@@ -358,6 +361,9 @@ isOneToOne: false
                            },
 "otcb_regra_evidencia":
 { Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"],"p_tipo": Database["public"]['Enums']["otcb_tipo_evidencia"] }; Returns: Record<string, unknown>
+                           },
+"otcb_resultado_foto":
+{ Args: { "p_foto_id": string }; Returns: Json
                            },
 "otcb_salvar_opiniao":
 { Args: { "p_bar_id": string,"p_nota": number,"p_texto": string,"p_usuario": string }; Returns: string

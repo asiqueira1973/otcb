@@ -681,6 +681,18 @@ $$;
 ALTER FUNCTION "public"."otcb_e_admin"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_fotos_hoje"("p_usuario" "uuid") RETURNS integer
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select count(*)::integer from public.otcb_fotos
+   where usuario_id = p_usuario and public.otcb_dia_sp(criado_em) = public.otcb_hoje_sp();
+$$;
+
+
+ALTER FUNCTION "public"."otcb_fotos_hoje"("p_usuario" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_garimpo_disparar"("p_modo" "text", "p_execucao_id" "uuid" DEFAULT NULL::"uuid") RETURNS bigint
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1248,6 +1260,49 @@ $$;
 
 
 ALTER FUNCTION "public"."otcb_regra_evidencia"("p_tipo" "public"."otcb_tipo_evidencia", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", OUT "peso" numeric, OUT "meia_vida_dias" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_resultado_foto"("p_foto_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_foto public.otcb_fotos%rowtype;
+  v_nome text;
+  v_carimbo boolean;
+  v_motivo text;
+  v_total integer;
+begin
+  select * into v_foto from public.otcb_fotos where id = p_foto_id;
+  if not found then
+    raise exception 'foto_inexistente' using errcode = 'P0001';
+  end if;
+  select nome into v_nome from public.otcb_bares where id = v_foto.bar_id;
+  v_carimbo := exists (select 1 from public.otcb_carimbos where foto_id = p_foto_id);
+  v_motivo := case
+    when v_carimbo then null
+    when not v_foto.e_chopp then 'nao_e_chopp'
+    when v_foto.bar_id is null then 'sem_bar'
+    when not v_foto.usuario_confirmou_brahma then 'nao_confirmou'
+    when exists (select 1 from public.otcb_carimbos where usuario_id = v_foto.usuario_id and bar_id = v_foto.bar_id) then 'ja_tinha'
+    else 'limite_dia' end;
+  select count(*)::integer into v_total from public.otcb_carimbos where usuario_id = v_foto.usuario_id;
+
+  if v_foto.e_chopp then
+    insert into public.otcb_mensagens (usuario_id, papel, conteudo)
+    values (v_foto.usuario_id, 'sistema',
+            'A pessoa avaliou um chopp no Colarinhômetro: nota ' || coalesce(v_foto.nota_colarinho::text, '?')
+            || coalesce(' no bar ' || v_nome, ', sem bar identificado por perto')
+            || case when v_carimbo then ', e ganhou carimbo novo.' else '.' end);
+  end if;
+
+  return jsonb_build_object('carimbo_novo', v_carimbo, 'motivo_sem_carimbo', v_motivo,
+                            'nome_bar', v_nome, 'total_carimbos', v_total);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_resultado_foto"("p_foto_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_salvar_opiniao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_texto" "text", "p_nota" smallint) RETURNS "uuid"
@@ -2075,6 +2130,11 @@ GRANT ALL ON FUNCTION "public"."otcb_e_admin"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_fotos_hoje"("p_usuario" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_fotos_hoje"("p_usuario" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."otcb_garimpo_disparar"("p_modo" "text", "p_execucao_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_garimpo_disparar"("p_modo" "text", "p_execucao_id" "uuid") TO "service_role";
 
@@ -2183,6 +2243,11 @@ GRANT ALL ON FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uu
 
 REVOKE ALL ON FUNCTION "public"."otcb_regra_evidencia"("p_tipo" "public"."otcb_tipo_evidencia", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", OUT "peso" numeric, OUT "meia_vida_dias" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_regra_evidencia"("p_tipo" "public"."otcb_tipo_evidencia", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", OUT "peso" numeric, OUT "meia_vida_dias" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_resultado_foto"("p_foto_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_resultado_foto"("p_foto_id" "uuid") TO "service_role";
 
 
 
