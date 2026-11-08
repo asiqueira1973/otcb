@@ -475,6 +475,22 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - apagar a foto manteve os carimbos;
   - os dados foram limpos.
 
+### Opiniões e resumo (8.8)
+- **Ficha:**
+  - resumo da IA no topo, quando existe (11.8);
+  - depois as opiniões publicadas, 10 por página com "Ver mais" (`otcb_opinioes_do_bar` com `p_pagina`);
+  - a opinião da própria pessoa aparece à parte, lida pela política `otcb_opinioes_le_proprias`; se estiver oculta (moderação, denúncias ou admin), mostra a 15.17 só para o dono, sem "Denunciar".
+- **Denúncias:** a 3ª, de pessoas distintas, oculta a opinião (`oculta_denuncias`, trigger da 8.2). Com menos de 3 publicadas, o resumo volta a nulo.
+- **Resumo (garimpo, modo `resumos`):** recebe só texto e nota, nunca o apelido. Sai com até 400 caracteres, cortado no fim de frase ou palavra.
+- **Chamadas ao `claude-haiku-5-5`:** usam `max_tokens: 2048` e `effort: "low"`. O modelo raciocina antes de responder, e com 200 tokens o texto de ódio parava em `max_tokens` e virava 503 (bug achado na checagem real).
+- **Checagem real (08/11/2026):**
+  - ofensa a funcionário, ódio, nome completo de terceiro e incentivo ao excesso foram recusados;
+  - a crítica dura foi publicada;
+  - o resumo real não citou apelidos;
+  - 3 denúncias ocultaram a opinião; o dono continuou vendo e as outras pessoas não;
+  - o resumo sumiu com 2 publicadas;
+  - os dados foram limpos.
+
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
 1. Lê `supabase/seed/estabelecimentos_otcb_antigo.csv`, ignorando linhas sem nome.
