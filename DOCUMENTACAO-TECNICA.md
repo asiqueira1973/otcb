@@ -324,8 +324,8 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Saída:** `{mensagem_id, texto, blocos, bloqueada_guardrail}`.
 - **Erros:** 401, 422, 429 `limite_mensagens` (com `texto` 15.8) e 503 `ia_indisponivel` (com `texto` 15.9). No 503 nada é gravado.
 - **Ordem:**
-  1. **Guardrail 11.18** (`guardrails.ts`): regex sem acento, na ordem menor → dirigir → quantidade → compra. "Tenho N" só conta como idade com "anos" ou no fim da frase; "compra" exige comprar, pedir que o OTCB venda ou entregue, ou levar para casa ("o bar vende chopp Brahma?" passa); "desafio" só com bebida. Responde o texto fixo da 15.11 e não chama o modelo. O log leva só `{evento:'guardrail', tipo}`; "menor" também marca `revisao_menor_em`.
-  2. **Limite, contexto e perfil**, consultados em paralelo e adiantados pelo `sub` do JWT enquanto o Auth valida o token. Nada é usado antes da confirmação; `sub` diferente do usuário confirmado → 401. Com 40 mensagens no dia → 429.
+  1. **Guardrail 11.18** (`guardrails.ts`): regex sem acento, na ordem menor → dirigir → quantidade → compra. "Tenho N" só conta como idade com "anos" ou no fim da frase; "compra" exige comprar, pedir que o OTCB venda ou entregue, ou levar para casa ("o bar vende chopp Brahma?" e "você sabe se o bar vende…?" passam; "você(s)" só conta colado ao verbo); "desafio" só com bebida. Responde o texto fixo da 15.11 e não chama o modelo. O log leva só `{evento:'guardrail', tipo}`; "menor" também marca `revisao_menor_em`.
+  2. **Limite, contexto e perfil**, consultados em paralelo e adiantados pelo `sub` do JWT enquanto o Auth valida o token. Nada é usado antes da confirmação; `sub` diferente do usuário confirmado → 401. Risco aceito: um token forjado provoca 3 leituras de serviço antes de ser recusado (o resultado é descartado e nada vaza). Com 40 mensagens no dia → 429.
   3. **Modelo** `claude-sonnet-5-5`, com esforço `low`:
      - o prompt fixo `prompts/agente.v2.ts` e as ferramentas ficam em cache; o contexto do turno (apelido, time, localização e hora de SP) vem num bloco de sistema separado;
      - no máximo 5 rodadas de ferramenta; a 6ª chamada usa `tool_choice: none`;

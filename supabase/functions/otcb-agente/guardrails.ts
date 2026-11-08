@@ -34,7 +34,8 @@ const PADROES: Record<TipoGuardrail, RegExp[]> = {
     /\b(delivery|ifood|rappi|ze delivery)\b/,
     // Comprar bebida, ou pedir que o OTCB venda/entregue. "O bar vende chopp Brahma?" é a pergunta do app (B1).
     /\b(comprar|compro|compra)\b.*\b(chop+|cerveja|bebida|barril|brahma)\b/,
-    /\b(voces|vcs|voce|vc|o app|otcb)\b.*\b(vende|vendem|vender|entrega|entregam|entregar)\b/,
+    // "Você(s)" ou o app como sujeito colado ao verbo ("vocês vendem?"); "você sabe se o bar vende…?" passa (P1).
+    /\b(voces|vcs|voce|vc|o app|otcb) (tambem |ai |nao )?(vende|vendem|vender|entrega|entregam|entregar)\b/,
     /\b(chop+|cerveja|bebida|barril)\b.*\b(em casa|pra levar|para levar|pra entregar)\b/,
   ],
 };
