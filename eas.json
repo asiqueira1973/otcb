@@ -37,7 +37,7 @@
         "ascApiKeyPath": "./secrets/AuthKey_STNQW83D6N.p8",
         "ascApiKeyId": "STNQW83D6N",
         "ascApiKeyIssuerId": "90de25b0-42e2-4dd2-bd6a-dc601a2d661c",
-        "ascAppId": "PREENCHER_APPLE_ID_DO_APP"
+        "ascAppId": "6832270339"
       },
       "android": {
         "track": "internal",
