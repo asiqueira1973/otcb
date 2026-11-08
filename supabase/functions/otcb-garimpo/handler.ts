@@ -41,9 +41,11 @@ export async function handleGarimpo(req: Request, deps: DepsHandler): Promise<Re
     return new Response(JSON.stringify({ error: "modo_invalido" }), { status: 400, headers: JSON_HEADERS });
   }
   const modo = body.modo as Modo;
-  const s = deps.servicos();
+  let segredos: string[] = [];
 
   try {
+    const s = deps.servicos();
+    segredos = s.segredos;
     let execucaoId = body.execucao_id ?? null;
     if (!execucaoId) {
       execucaoId = await s.db.iniciarExecucao(modo);
@@ -61,7 +63,7 @@ export async function handleGarimpo(req: Request, deps: DepsHandler): Promise<Re
       status: resultado ? 200 : 202, headers: JSON_HEADERS,
     });
   } catch (error) {
-    console.error("otcb-garimpo:", errorMessage(error, s.segredos));
+    console.error("otcb-garimpo:", errorMessage(error, segredos));
     return new Response(JSON.stringify({ error: "falha_garimpo" }), { status: 500, headers: JSON_HEADERS });
   }
 }

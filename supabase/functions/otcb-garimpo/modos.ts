@@ -20,11 +20,15 @@ export function urlStatusGoogle(placeId: string): string {
   return `https://www.google.com/maps/place/?q=place_id:${placeId}`;
 }
 
+// Grava uma evidência proposta no bar (upsert da migration 0800) e conta as criadas.
+// Recebe: contexto, bar, evidência e url_fonte. Devolve: nada.
 async function gravar(ctx: Contexto, barId: string, e: EvidenciaProposta, url: string): Promise<void> {
   const r = await ctx.db.registrarEvidencia({ barId, assunto: e.assunto, sinal: e.sinal, tipo: e.tipo, url, trecho: e.trecho, data: e.data });
   if (r === "criada") ctx.contadores.evidencias_criadas += 1;
 }
 
+// Faz o scrape de uma página e a classifica (13.6), contando Firecrawl e IA no orçamento (11.17).
+// Recebe: contexto, URL, título e descrição do contexto. Devolve: evidências propostas e o nome do bar.
 async function classificarPagina(ctx: Contexto, url: string, titulo: string, contexto: string): Promise<{
   evidencias: EvidenciaProposta[]; nomeBar: string;
 }> {
@@ -126,6 +130,8 @@ async function gerarFila(ctx: Contexto, bairro: string): Promise<Candidato[]> {
   return fila;
 }
 
+// Casa o lugar com um bar (11.16), criando-o só se houver evidência positiva de Brahma, e grava as evidências.
+// Recebe: contexto, lugar do Google, bairro e evidências com url_fonte. Devolve: nada.
 async function gravarNoBar(ctx: Contexto, lugar: GooglePlace, bairro: string, evidencias: { e: EvidenciaProposta; url: string }[]) {
   if (evidencias.length === 0) return;
   const criar = evidencias.some(({ e }) => e.assunto === "tem_brahma" && e.sinal === "positivo");
@@ -142,7 +148,8 @@ export const descoberta: ModoGarimpo<Candidato> = {
   async selecionar(ctx, pos, n) {
     pos.bairroIdx ??= 0;
     pos.fila ??= [];
-    while (pos.fila.length === 0 && pos.bairroIdx < ctx.bairros.length) {
+    // Confere o tempo entre bairros: serviços lentos não podem estourar o limite da função (P1).
+    while (pos.fila.length === 0 && pos.bairroIdx < ctx.bairros.length && !ctx.tempoEsgotado()) {
       const bairro = ctx.bairros[pos.bairroIdx];
       pos.fila = await gerarFila(ctx, bairro);
       pos.bairroIdx += 1;

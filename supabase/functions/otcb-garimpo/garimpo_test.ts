@@ -65,11 +65,11 @@ class FakeDb implements GarimpoDb {
   baresParaRevisita(limite: number, excluir: string[]) {
     return Promise.resolve(this.revisita.filter((b) => !excluir.includes(b.bar_id)).slice(0, limite));
   }
-  baresParaCoordenadas() { return Promise.resolve([]); }
-  atualizarCoordenadas() { return Promise.resolve(); }
-  baresParaResumo() { return Promise.resolve([]); }
-  opinioesPublicadas() { return Promise.resolve([]); }
-  gravarResumo() { return Promise.resolve(true); }
+  baresParaCoordenadas: GarimpoDb["baresParaCoordenadas"] = () => Promise.resolve([]);
+  atualizarCoordenadas: GarimpoDb["atualizarCoordenadas"] = () => Promise.resolve();
+  baresParaResumo: GarimpoDb["baresParaResumo"] = () => Promise.resolve([]);
+  opinioesPublicadas: GarimpoDb["opinioesPublicadas"] = () => Promise.resolve([]);
+  gravarResumo: GarimpoDb["gravarResumo"] = () => Promise.resolve(true);
 }
 
 const SIM: Classificacao = fixture("claude_classificacao_sim.json");
@@ -315,4 +315,50 @@ Deno.test("descoberta: falha persistente na busca de um bairro não trava a exec
   assertEquals(buscasGoogle.filter((q) => q.startsWith("bar chopp Brahma")).length, 2, "cada bairro buscado uma vez");
   assertEquals(db.bares.length, 2, "o resultado do Google é aproveitado mesmo com o Firecrawl falhando");
   assertEquals(db.execucoes.get(id)!.erros.filter((e) => String(e.etapa).startsWith("busca:")).length, 2);
+});
+
+Deno.test("coordenadas: renova lat/lng dos bares selecionados (11.10)", async () => {
+  const db = new FakeDb();
+  const gravadas: [string, number, number][] = [];
+  db.baresParaCoordenadas = (limite: number, excluir: string[]) =>
+    Promise.resolve([{ bar_id: "b1", google_place_id: "p1" }, { bar_id: "b2", google_place_id: "p2" }].filter((b) => !excluir.includes(b.bar_id)).slice(0, limite));
+  db.atualizarCoordenadas = (id: string, lat: number, lng: number) => { gravadas.push([id, lat, lng]); return Promise.resolve(); };
+  const id = (await db.iniciarExecucao("coordenadas"))!;
+  const r = await executarLote(id, "coordenadas", servicos(db), () => AGORA);
+  assertEquals(r.status, "concluida");
+  assertEquals(gravadas, [["b1", -23.5, -46.6], ["b2", -23.5, -46.6]]);
+  assertEquals(db.execucoes.get(id)!.cursor.uso?.details_basico, 2);
+});
+
+Deno.test("resumos: gera e grava o resumo com 3+ opiniões; com menos, não chama a IA (11.8)", async () => {
+  const db = new FakeDb();
+  const resumos: [string, string][] = [];
+  db.baresParaResumo = (limite: number, excluir: string[]) =>
+    Promise.resolve([{ bar_id: "b1", nome: "Bar 1" }, { bar_id: "b2", nome: "Bar 2" }].filter((b) => !excluir.includes(b.bar_id)).slice(0, limite));
+  db.opinioesPublicadas = (barId: string) => Promise.resolve(barId === "b1"
+    ? [{ texto: "Ótimo chopp", nota: 5 }, { texto: "Bom", nota: 4 }, { texto: "Colarinho perfeito", nota: null }]
+    : [{ texto: "Só uma", nota: 3 }]);
+  db.gravarResumo = (barId: string, texto: string) => { resumos.push([barId, texto]); return Promise.resolve(true); };
+  const id = (await db.iniciarExecucao("resumos"))!;
+  const r = await executarLote(id, "resumos", servicos(db), () => AGORA);
+  assertEquals(r.status, "concluida");
+  assertEquals(resumos, [["b1", "Resumo."]]);
+  assertEquals(db.execucoes.get(id)!.cursor.uso?.ia, 1);
+});
+
+Deno.test("descoberta: tempo esgotado entre bairros pausa e reagenda, sem pular bairro", async () => {
+  const db = new FakeDb();
+  let t = AGORA;
+  const relogio = () => t;
+  const buscas: string[] = [];
+  const s = servicos(db, {
+    google: { searchText: (q) => { buscas.push(q); t += 120_000; return Promise.resolve([]); } },
+  });
+  const id = (await db.iniciarExecucao("descoberta"))!;
+  db.execucoes.get(id)!.cursor = { bairros: ["Pinheiros", "Moema", "Lapa"] };
+  const r = await executarLote(id, "descoberta", s, relogio);
+  assertEquals(r.status, "em_andamento");
+  assertEquals(buscas.filter((q) => q.startsWith("bar chopp Brahma")).length, 1);
+  assertEquals(db.execucoes.get(id)!.cursor.posicao?.bairroIdx, 1);
+  assertEquals(db.disparos.length, 1);
 });

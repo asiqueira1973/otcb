@@ -5,6 +5,7 @@ import type { Cursor, GarimpoDb, Modo } from "./tipos.ts";
 // Implementação de GarimpoDb com o cliente de serviço (funções service-only da migration 0800).
 // Recebe: cliente Supabase com service role. Devolve: GarimpoDb. Erros do banco sobem como Error.
 export function createGarimpoDb(admin: SupabaseClient): GarimpoDb {
+  // Chama uma função SQL service-only. Recebe: nome e argumentos. Devolve: o resultado; erro sem dados sensíveis.
   async function rpc<T>(nome: string, args: Record<string, unknown>): Promise<T> {
     const { data, error } = await admin.rpc(nome, args);
     if (error) throw new Error(`db_${nome}: ${error.code ?? ""} ${error.message}`);

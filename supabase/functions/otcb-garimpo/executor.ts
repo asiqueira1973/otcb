@@ -42,6 +42,7 @@ export async function executarLote(execucaoId: string, modo: Modo, s: Servicos, 
     agora: new Date(inicio), bairros: cursor.bairros ?? BAIRROS_DESCOBERTA,
     contadores: { bares_novos: 0, evidencias_criadas: 0 },
     registrarErro: () => {},
+    tempoEsgotado: () => agora() - inicio > TEMPO_MAXIMO_MS,
   };
   const m = MODOS_GARIMPO[modo];
   const novosErros: Record<string, unknown>[] = [];
@@ -67,7 +68,12 @@ export async function executarLote(execucaoId: string, modo: Modo, s: Servicos, 
       fim = true;
       break;
     }
-    if (selecionados.length === 0) { fim = true; break; }
+    if (selecionados.length === 0) {
+      // Seleção vazia: ou o modo terminou, ou parou por tempo no meio (ex.: entre bairros da descoberta).
+      if (m.acabou(ctx, pos, 0, pedidos)) fim = true;
+      else pausou = true;
+      break;
+    }
 
     let rodadaCompleta = true;
     for (const item of selecionados) {

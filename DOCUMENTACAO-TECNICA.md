@@ -245,7 +245,10 @@ O `otcb_cron_jogos` entra no épico 8.9.
 - No máximo 20 itens **e** cerca de 100 s; tetos da 11.17 por execução e por mês (`tetos.ts`).
 - Teto atingido: termina `concluida`, com `{motivo: 'teto_atingido', recurso, escopo}` em `erros`.
 - Falha de um item: entra em `erros` (`{item, erro}`, sanitizado) e o lote segue.
-- Erro fatal termina `falhou`. São fatais: Google 401/402/403, Firecrawl 401/402, Claude 401/403 ou falta de crédito. O **403 do Firecrawl no scrape** é site bloqueado e conta como falha do item.
+- Erro fatal termina `falhou`. São fatais: Google 401/402/403 e 400 `API_KEY_INVALID`, Firecrawl 401/402, Claude 401/403 ou falta de crédito. O **403 do Firecrawl no scrape** é site bloqueado e conta como falha do item.
+- Na descoberta, cada busca do bairro é isolada: a falha vira `{etapa: 'busca:{bairro}:{servico}'}` em `erros`, e o bairro avança.
+- O lote segue para o próximo bairro na mesma invocação até 20 itens ou 100 s.
+- Timeouts: Google 30 s, Firecrawl 45 s, Claude 60 s.
 - Se sobra trabalho, salva a posição no `cursor` e se reagenda via `otcb_garimpo_disparar`.
 - Ao concluir, o `cursor` guarda só `{uso}`, o uso por recurso que serve de base para os tetos mensais.
 

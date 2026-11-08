@@ -63,4 +63,6 @@ export type Contexto = {
   contadores: { bares_novos: number; evidencias_criadas: number };
   // Registra uma falha que não é de item (ex.: busca de um bairro) em `erros`, já sanitizada (12.5).
   registrarErro: (info: { etapa: string; erro: unknown }) => void;
+  // true quando o lote passou do tempo máximo da invocação (premissa P1).
+  tempoEsgotado: () => boolean;
 };

@@ -2,7 +2,7 @@
 -- (critério 2 e reabertura), casamento 11.16, seleção de trabalho (revisita, coordenadas 11.10, resumos 11.8),
 -- execuções (12.3), uso do mês (11.17) e permissões (só serviço).
 begin;
-select plan(35);
+select plan(36);
 
 insert into public.otcb_bares (id, nome, endereco, bairro, latitude, longitude, google_place_id) values
   ('00000000-0000-0000-0000-000000800001', 'Bar do Garimpo', 'Rua G, 1', 'Teste80', -18.000000, -48.000000, 'place-80-1'),
@@ -98,6 +98,16 @@ select ok(not has_function_privilege('authenticated', 'public.otcb_configurar_ga
 select ok(not has_function_privilege('authenticated',
   'public.otcb_registrar_evidencia_garimpo(uuid, public.otcb_assunto_evidencia, public.otcb_sinal_evidencia, public.otcb_tipo_evidencia, text, text, timestamptz)', 'execute'),
   'cliente não grava evidência do garimpo');
+
+select is(
+  (select array_agg(p.proname::text order by p.proname)
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname in ('otcb_casar_bar', 'otcb_casar_ou_criar_bar', 'otcb_registrar_evidencia_garimpo',
+            'otcb_bares_para_revisita', 'otcb_bares_para_coordenadas', 'otcb_atualizar_coordenadas', 'otcb_bares_para_resumo',
+            'otcb_gravar_resumo', 'otcb_garimpo_iniciar', 'otcb_garimpo_uso_mes', 'otcb_configurar_garimpo', 'otcb_garimpo_disparar')
+      and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute'))),
+  null::text[],
+  'nenhuma das 12 funções do garimpo é executável por anon ou authenticated');
 
 select * from finish();
 rollback;
