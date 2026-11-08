@@ -553,3 +553,17 @@ Deno.test("verifier 8.9 (menor): só cards com jogos desatualizados → texto pa
   const corpo = await (await handleAgente(req({ mensagem: "jogo do Corinthians" }), deps(db, modelo))).json();
   assertEquals(corpo.texto, `${TEXTOS.soCards}\n\n${TEXTOS.jogosDesatualizados}`);
 });
+
+// Bug real do 8.11 (print da loja): com o horário em UTC, o modelo fazia a conta de fuso em voz alta
+// ("23:30 UTC = 20:30 em SP.") e isso virava a resposta. A ferramenta entrega o horário já em São Paulo.
+Deno.test("bug do 8.11: jogos_de_hoje entrega o horário em São Paulo (inicio_sp)", async () => {
+  const { db } = fakeDb();
+  db.jogos = () => Promise.resolve([
+    { jogo_id: "j1", competicao: "Brasileirão", mandante: "Chapecoense", visitante: "Vasco da Gama", inicio: "2026-11-14T23:30:00Z" },
+  ]);
+  const { modelo, chamadas } = fakeModelo([usoFerramenta("t1", "jogos_de_hoje", { time: "Vasco" }), textoFinal("Sábado tem Vasco.")]);
+  await handleAgente(req({ mensagem: "quando joga o Vasco?" }), deps(db, modelo));
+  const resultado = JSON.parse((chamadas[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].content as string);
+  assertEquals(resultado.jogos_do_time[0].inicio_sp, "sáb 14/11 20:30");
+  assertFalse("inicio" in resultado.jogos_do_time[0]);
+});
