@@ -16,7 +16,7 @@ Extensões usadas, liberadas pelo Alexandre: `pg_trgm`, `unaccent` e `pg_net` (n
 | `otcb_status_bar` | `confirmado`: tem chopp Brahma, com pontuação ≥ 1,0. `provavel`: ≥ 0,5. `incerto`: aparece como "a confirmar". `sem_brahma`: ≤ −0,5. `fechado`: o bar fechou. |
 | `otcb_assunto_evidencia` | Sobre o que é a evidência: se `tem_brahma`, se `transmite_jogos` ou o `funcionamento` do bar (aberto ou fechado). |
 | `otcb_sinal_evidencia` | `positivo` confirma, `negativo` nega, `fechado` diz que o bar fechou (só vale com `funcionamento`). |
-| `otcb_tipo_evidencia` | A fonte: `foto_colarinhometro`, `confirmacao_usuario`, `sugestao_usuario`, `cardapio_site`, `pagina_web`, `avaliacao_google`, `status_google` e `seed_otcb_antigo` (CSV antigo). |
+| `otcb_tipo_evidencia` | A fonte: `foto_colarinhometro`, `confirmacao_usuario`, `sugestao_usuario`, `cardapio_site`, `pagina_web`, `avaliacao_google`, `status_google` e `seed_otcb_antigo` (CSV antigo). `curadoria` (8.11): o dono do app atesta que o bar tem chopp. |
 | `otcb_origem_evidencia` | Quem trouxe a evidência: `usuario`, `garimpo` ou `seed`. |
 | `otcb_status_opiniao` | `publicada`, `oculta_moderacao` (recusada pela IA), `oculta_denuncias` (3 denúncias) ou `oculta_admin`. |
 | `otcb_papel_mensagem` | Autor da mensagem do chat: `usuario`, `assistente` ou `sistema` (registro de ação feita por card). |
@@ -648,3 +648,4 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Termos e Privacidade (8.10) | Telas do app com texto embutido, e não links externos. | Funcionam sem rede; a URL pública para as lojas fica para o 8.11. |
 | Configuração em `app.config.ts` sem a marca (8.11) | Os textos de permissão do sistema dizem "chopp", sem a marca. | O hook e o teste de marca cobrem `app.config.ts`; o texto de permissão aparece também na revisão da loja. |
 | Disponibilidade na loja (8.11) | Só Brasil (decisão do Alexandre). | O conteúdo cobre só São Paulo (anti-escopo "app nacional"); o padrão da Dab Lab é todos os países. |
+| Evidência `curadoria` (8.11) | Tipo novo, peso +1,2 e meia-vida de 36.500 dias (na prática não decai). Gravada para os 33 bares do CSV original, que ficam `confirmado`. A semente (caso A da 11.2.1) não muda. | Decisão do Alexandre (08/11/2026): todos os bares do CSV têm chopp Brahma, e no lançamento, sem usuários, nada deve cair sozinho. Peso 1,2 porque com 1,0 o decaimento mínimo já deixava o bar abaixo do limite de confirmado. Uma confirmação negativa (−0,6) ainda derruba para provável. |

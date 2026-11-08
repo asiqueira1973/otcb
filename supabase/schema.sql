@@ -113,7 +113,8 @@ CREATE TYPE "public"."otcb_tipo_evidencia" AS ENUM (
     'pagina_web',
     'avaliacao_google',
     'status_google',
-    'seed_otcb_antigo'
+    'seed_otcb_antigo',
+    'curadoria'
 );
 
 
@@ -1306,6 +1307,8 @@ begin
       peso := 0.4; meia_vida_dias := 365;
     when p_tipo = 'seed_otcb_antigo' and p_assunto = 'tem_brahma' and p_sinal = 'positivo' then
       peso := 0.2; meia_vida_dias := 180;
+    when p_tipo = 'curadoria' and p_assunto = 'tem_brahma' and p_sinal = 'positivo' then
+      peso := 1.2; meia_vida_dias := 36500;
     else
       raise exception 'evidencia_invalida' using errcode = '22023';
   end case;
