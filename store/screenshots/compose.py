@@ -103,5 +103,9 @@ def compose(raw: str, headline: str, body: str) -> Image.Image:
 if __name__ == "__main__":
     OUT.mkdir(exist_ok=True)
     for i, (raw, headline, body) in enumerate(SLIDES, start=1):
-        compose(raw, headline, body).save(OUT / f"{i:02d}.png")
+        img = compose(raw, headline, body)
+        img.save(OUT / f"{i:02d}.png")
+        # Slot "iPhone com Dynamic Island (tela média)", 6,3": 1206×2622 (mesma proporção).
+        (OUT.parent / "appstore-6.3").mkdir(exist_ok=True)
+        img.resize((1206, 2622), Image.LANCZOS).save(OUT.parent / "appstore-6.3" / f"{i:02d}.png")
         print(f"{i:02d}.png")
