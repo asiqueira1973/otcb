@@ -274,3 +274,38 @@ Deno.test("critério 8: rodada que só chama mostrar encerra o turno sem nova ch
   assertEquals(corpo.texto, "Achei o Bar b1.");
   assertEquals(corpo.blocos[0].tipo, "card_bar");
 });
+
+// ===================================================================== verifier 8.4 (bugs B1 e B2)
+
+Deno.test("B1: perguntas normais não disparam guardrail (números sem 'anos', 'vende chopp Brahma?', 'desafio' sem bebida)", () => {
+  for (const ok of [
+    "tenho 3 amigos comigo, qual bar?",
+    "tenho 5 pessoas, cabe no balcão?",
+    "tenho 1 hora livre, chopp perto?",
+    "o Bar do Nico vende chopp Brahma?",
+    "qual bar vende chopp perto de mim?",
+    "onde ver o desafio de hoje no futebol?",
+    "tem chopp Brahma no Bar Leo?",
+  ]) assertEquals(verificarGuardrail(ok), null, ok);
+  // os casos reais seguem disparando
+  assertEquals(verificarGuardrail("tenho 16 anos")?.tipo, "menor");
+  assertEquals(verificarGuardrail("tenho 17")?.tipo, "menor");
+  assertEquals(verificarGuardrail("onde compro um barril de chopp?")?.tipo, "compra");
+  assertEquals(verificarGuardrail("vocês vendem chopp pra levar?")?.tipo, "compra");
+  assertEquals(verificarGuardrail("desafio de quem vira mais chopp")?.tipo, "quantidade");
+});
+
+Deno.test("B2 (critério 1): lista_bares e mapa saem na ordem da 11.9 (status, depois distância), seja qual for a ordem dos ids", () => {
+  const cache = new CacheTurno();
+  for (const b of [
+    BAR("inc-perto", "incerto", { distancia_metros: 100 }),
+    BAR("conf-longe", "confirmado", { distancia_metros: 1900 }),
+    BAR("prov", "provavel", { distancia_metros: 50 }),
+    BAR("conf-perto", "confirmado", { distancia_metros: 400 }),
+  ]) cache.bares.set(b.bar_id, paraCardBar(b, null)!);
+  const ids = ["inc-perto", "prov", "conf-longe", "conf-perto"];
+  const { blocos } = montarBlocos([{ tipo: "lista_bares", titulo: "X", bar_ids: ids }, { tipo: "mapa", bar_ids: ids }], cache);
+  const esperado = ["conf-perto", "conf-longe", "prov", "inc-perto"];
+  assertEquals((blocos[0] as { bares: { bar_id: string }[] }).bares.map((b) => b.bar_id), esperado);
+  assertEquals((blocos[1] as { pontos: { bar_id: string }[] }).pontos.map((b) => b.bar_id), esperado);
+});
