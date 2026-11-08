@@ -137,6 +137,7 @@ export function createClaudeClient(apiKey: string, criar?: CriarMensagem): Claud
         const response = await client.messages.create({
           model: MODELO_CLASSIFICACAO,
           max_tokens: 2048, // espaço para o raciocínio; o texto é cortado em 400 abaixo (bug real do 8.8)
+          output_config: { effort: "low" },
           system: SISTEMA_RESUMO,
           messages: [{ role: "user", content: `Opiniões:\n${lista}` }],
         });

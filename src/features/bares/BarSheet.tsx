@@ -108,12 +108,15 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
     if (onCard && visible && meuApelido === null) void apelidoProprio().then(setMeuApelido);
   }, [onCard, visible, meuApelido]);
 
-  // "Ver mais" (8.8): busca a próxima página de 10. Recebe: nada.
+  // "Ver mais" (8.8): busca a próxima página de 10, uma de cada vez (toque duplo não repete a página).
+  const [carregandoMais, setCarregandoMais] = useState(false);
   async function verMais() {
-    if (!atual || !barId) return;
+    if (!atual || !barId || carregandoMais) return;
+    setCarregandoMais(true);
     const pagina = atual.pagina + 1;
     const mais = await fetchOpinions(barId, pagina).catch(() => [] as Opiniao[]);
     setLoadedOpinions({ ...atual, list: [...atual.list, ...mais], pagina, temMais: mais.length === 10 });
+    setCarregandoMais(false);
   }
 
   async function darOpiniao(b: CardBar) {
@@ -224,7 +227,7 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
               ))
             )}
             {atual?.temMais ? (
-              <Button testID="ficha-ver-mais" variant="ghost" label={copy.sheet.more} onPress={() => void verMais()} />
+              <Button testID="ficha-ver-mais" variant="ghost" label={copy.sheet.more} loading={carregandoMais} onPress={() => void verMais()} />
             ) : null}
           </ScrollView>
         )}
