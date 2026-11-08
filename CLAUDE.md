@@ -34,7 +34,9 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - Status do bar nunca é escrito à mão: só `otcb_recalcular_bar` (regras 11.1–11.2). Peso/meia-vida vêm de `otcb_regra_evidencia` (trigger sobrescreve o que o chamador mandar).
 - Evidência de usuário só via RPC (`otcb_confirmar_bar`/`otcb_sugerir_bar`) ou trigger de foto; cliente não tem grant de insert. Limites diários usam o dia de SP (`otcb_hoje_sp`).
 - Semente: `npm run seed:import` (lê `.env` + `.env.local`; idempotente). `.env.local` tem segredos e nunca é exibido.
-- pg_cron roda em UTC (SP = UTC−3).
+- pg_cron roda em UTC (SP = UTC−3). Garimpo: `npm run garimpo:configurar` (segredo do cron → .env.local + Vault); secrets das funções via `supabase secrets set --env-file` com arquivo temporário filtrado (nunca exibir).
+- `otcb-garimpo` usa `verify_jwt = false` (autentica por `x-otcb-cron`). Erro 403 do Firecrawl no scrape é do item, não fatal.
+- Deno: rodar com `--config supabase/functions/deno.json` (sem isso ele procura npm no node_modules do app).
 - Anonimizar evidência só por `otcb_anonimizar_evidencias` (apaga as superadas antes de anular `usuario_id`; senão quebra o "um voto por pessoa").
 - O agente de IA não grava nada no banco; toda escrita do usuário passa por card (8.5, 13.3).
 - Nenhuma mecânica conta quantidade de chopp (princípio 3).

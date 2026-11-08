@@ -268,6 +268,20 @@ $$;
 ALTER FUNCTION "public"."otcb_anonimizar_evidencias"("p_usuario" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_atualizar_coordenadas"("p_bar_id" "uuid", "p_latitude" double precision, "p_longitude" double precision) RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update public.otcb_bares
+     set latitude = round(p_latitude::numeric, 6), longitude = round(p_longitude::numeric, 6),
+         coordenadas_atualizadas_em = now()
+   where id = p_bar_id;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_atualizar_coordenadas"("p_bar_id" "uuid", "p_latitude" double precision, "p_longitude" double precision) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double precision, "p_longitude" double precision) RETURNS TABLE("bar_id" "uuid", "distancia_metros" integer)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -285,6 +299,70 @@ $$;
 
 
 ALTER FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double precision, "p_longitude" double precision) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_bares_para_coordenadas"("p_limite" integer, "p_excluir" "uuid"[] DEFAULT '{}'::"uuid"[]) RETURNS TABLE("bar_id" "uuid", "google_place_id" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select b.id, b.google_place_id
+    from public.otcb_bares b
+   where b.excluido_em is null and b.google_place_id is not null
+     and b.coordenadas_atualizadas_em < now() - interval '25 days'
+     and not (b.id = any(p_excluir))
+   order by b.coordenadas_atualizadas_em
+   limit p_limite;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_bares_para_coordenadas"("p_limite" integer, "p_excluir" "uuid"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_bares_para_resumo"("p_limite" integer, "p_excluir" "uuid"[] DEFAULT '{}'::"uuid"[]) RETURNS TABLE("bar_id" "uuid", "nome" "text")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select b.id, b.nome
+    from public.otcb_bares b
+   where b.excluido_em is null and b.qtd_opinioes >= 3
+     and not (b.id = any(p_excluir))
+     and (b.resumo_opinioes is null
+          or b.resumo_atualizado_em < now() - interval '30 days'
+          or (select count(*) from public.otcb_opinioes o
+               where o.bar_id = b.id and o.status = 'publicada' and o.criado_em > b.resumo_atualizado_em) >= 3)
+   order by b.resumo_atualizado_em nulls first
+   limit p_limite;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_bares_para_resumo"("p_limite" integer, "p_excluir" "uuid"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_bares_para_revisita"("p_limite" integer, "p_excluir" "uuid"[] DEFAULT '{}'::"uuid"[]) RETURNS TABLE("bar_id" "uuid", "nome" "text", "bairro" "text", "google_place_id" "text", "urls" "text"[])
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select b.id, b.nome, b.bairro, b.google_place_id,
+         coalesce((select array_agg(u.url_fonte order by u.d desc) from (
+                     select e.url_fonte, max(e.data_evidencia) as d
+                       from public.otcb_evidencias e
+                      where e.bar_id = b.id and e.tipo in ('cardapio_site', 'pagina_web')
+                      group by e.url_fonte order by d desc limit 2) u), '{}') as urls
+    from public.otcb_bares b
+    left join lateral (select max(e.data_evidencia) as visita
+                         from public.otcb_evidencias e
+                        where e.bar_id = b.id and e.tipo = 'status_google') v on true
+   where b.excluido_em is null
+     and not (b.id = any(p_excluir))
+     and (v.visita is null or v.visita < now() - interval '7 days')
+   order by (b.status = 'incerto') desc,
+            (not exists (select 1 from public.otcb_evidencias e where e.bar_id = b.id and e.origem = 'garimpo')) desc,
+            v.visita nulls first, b.criado_em
+   limit p_limite;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_bares_para_revisita"("p_limite" integer, "p_excluir" "uuid"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_buscar_bares"("p_latitude" double precision DEFAULT NULL::double precision, "p_longitude" double precision DEFAULT NULL::double precision, "p_raio_metros" integer DEFAULT NULL::integer, "p_texto" "text" DEFAULT NULL::"text", "p_bairro" "text" DEFAULT NULL::"text", "p_tem_balcao" boolean DEFAULT NULL::boolean, "p_transmite_jogos" boolean DEFAULT NULL::boolean, "p_classico" boolean DEFAULT NULL::boolean) RETURNS TABLE("bar_id" "uuid", "nome" "text", "bairro" "text", "endereco" "text", "latitude" numeric, "longitude" numeric, "distancia_metros" integer, "status" "public"."otcb_status_bar", "tem_balcao" boolean, "transmite_jogos" boolean, "classico" boolean, "nota_colarinho_media" numeric, "nota_opinioes_media" numeric, "qtd_opinioes" integer, "ultima_confirmacao_em" timestamp with time zone, "confirmacoes_60_dias" integer, "resumo_opinioes" "text")
@@ -332,6 +410,89 @@ $$;
 
 
 ALTER FUNCTION "public"."otcb_buscar_bares"("p_latitude" double precision, "p_longitude" double precision, "p_raio_metros" integer, "p_texto" "text", "p_bairro" "text", "p_tem_balcao" boolean, "p_transmite_jogos" boolean, "p_classico" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_casar_bar"("p_nome" "text", "p_latitude" double precision, "p_longitude" double precision) RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select b.id
+    from public.otcb_bares b
+   where b.excluido_em is null
+     and b.latitude between p_latitude - 0.001 and p_latitude + 0.001
+     and b.longitude between p_longitude - 0.001 and p_longitude + 0.001
+     and public.otcb_distancia_metros(p_latitude, p_longitude, b.latitude::float8, b.longitude::float8) <= 80
+     and extensions.similarity(public.otcb_normalizar(b.nome), public.otcb_normalizar(p_nome)) >= 0.5
+   order by public.otcb_distancia_metros(p_latitude, p_longitude, b.latitude::float8, b.longitude::float8)
+   limit 1;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_casar_bar"("p_nome" "text", "p_latitude" double precision, "p_longitude" double precision) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_casar_ou_criar_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_place_id" "text", "p_criar" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_bar uuid;
+begin
+  if p_place_id is not null then
+    select b.id into v_bar from public.otcb_bares b where b.google_place_id = p_place_id;
+    if v_bar is not null then
+      return jsonb_build_object('bar_id', v_bar, 'criado', false);
+    end if;
+  end if;
+
+  v_bar := public.otcb_casar_bar(p_nome, p_latitude, p_longitude);
+  if v_bar is not null then
+    if p_place_id is not null then
+      update public.otcb_bares set google_place_id = p_place_id where id = v_bar and google_place_id is null;
+    end if;
+    return jsonb_build_object('bar_id', v_bar, 'criado', false);
+  end if;
+
+  if not p_criar then
+    return jsonb_build_object('bar_id', null, 'criado', false);
+  end if;
+
+  insert into public.otcb_bares (nome, endereco, bairro, latitude, longitude, google_place_id)
+  values (trim(p_nome), trim(p_endereco), trim(p_bairro), round(p_latitude::numeric, 6), round(p_longitude::numeric, 6), p_place_id)
+  returning id into v_bar;
+  return jsonb_build_object('bar_id', v_bar, 'criado', true);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_casar_ou_criar_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_place_id" "text", "p_criar" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_configurar_garimpo"("p_url_funcoes" "text", "p_segredo" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id uuid;
+begin
+  select id into v_id from vault.secrets where name = 'otcb_url_funcoes';
+  if v_id is null then
+    perform vault.create_secret(p_url_funcoes, 'otcb_url_funcoes', 'OTCB: URL base das Edge Functions');
+  else
+    perform vault.update_secret(v_id, p_url_funcoes);
+  end if;
+
+  select id into v_id from vault.secrets where name = 'otcb_cron_secret';
+  if v_id is null then
+    perform vault.create_secret(p_segredo, 'otcb_cron_secret', 'OTCB: segredo do cabeçalho x-otcb-cron');
+  else
+    perform vault.update_secret(v_id, p_segredo);
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_configurar_garimpo"("p_url_funcoes" "text", "p_segredo" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_confirmar_bar"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia") RETURNS "jsonb"
@@ -476,6 +637,93 @@ $$;
 
 
 ALTER FUNCTION "public"."otcb_e_admin"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_garimpo_disparar"("p_modo" "text", "p_execucao_id" "uuid" DEFAULT NULL::"uuid") RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_url text;
+  v_segredo text;
+begin
+  select decrypted_secret into v_url from vault.decrypted_secrets where name = 'otcb_url_funcoes';
+  select decrypted_secret into v_segredo from vault.decrypted_secrets where name = 'otcb_cron_secret';
+  if v_url is null or v_segredo is null then
+    raise exception 'garimpo_nao_configurado' using errcode = 'P0001';
+  end if;
+  return net.http_post(
+    url := v_url || '/otcb-garimpo',
+    body := jsonb_strip_nulls(jsonb_build_object('modo', p_modo, 'execucao_id', p_execucao_id)),
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-otcb-cron', v_segredo),
+    timeout_milliseconds := 5000
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_garimpo_disparar"("p_modo" "text", "p_execucao_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_garimpo_iniciar"("p_tipo" "public"."otcb_tipo_execucao") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_id uuid;
+begin
+  update public.otcb_execucoes_garimpo
+     set status = 'falhou', concluido_em = now(),
+         erros = coalesce(erros, '[]'::jsonb) || jsonb_build_array(jsonb_build_object('motivo', 'tempo_esgotado'))
+   where tipo = p_tipo and status = 'em_andamento' and iniciado_em < now() - interval '2 hours';
+
+  if exists (select 1 from public.otcb_execucoes_garimpo where tipo = p_tipo and status = 'em_andamento') then
+    return null;
+  end if;
+
+  insert into public.otcb_execucoes_garimpo (tipo, cursor) values (p_tipo, '{}') returning id into v_id;
+  return v_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_garimpo_iniciar"("p_tipo" "public"."otcb_tipo_execucao") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_garimpo_uso_mes"() RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select jsonb_build_object(
+    'text_search', coalesce(sum((c -> 'uso' ->> 'text_search')::int), 0),
+    'details_basico', coalesce(sum((c -> 'uso' ->> 'details_basico')::int), 0),
+    'details_reviews', coalesce(sum((c -> 'uso' ->> 'details_reviews')::int), 0),
+    'firecrawl', coalesce(sum((c -> 'uso' ->> 'firecrawl')::int), 0),
+    'ia', coalesce(sum((c -> 'uso' ->> 'ia')::int), 0))
+    from (select case when cursor ~ '^\s*\{' then cursor::jsonb else '{}'::jsonb end as c
+            from public.otcb_execucoes_garimpo
+           where date_trunc('month', iniciado_em at time zone 'America/Sao_Paulo')
+                 = date_trunc('month', now() at time zone 'America/Sao_Paulo')) x;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_garimpo_uso_mes"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_gravar_resumo"("p_bar_id" "uuid", "p_resumo" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.otcb_bares
+     set resumo_opinioes = left(trim(p_resumo), 400), resumo_atualizado_em = now()
+   where id = p_bar_id and qtd_opinioes >= 3 and nullif(trim(p_resumo), '') is not null;
+  return found;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_gravar_resumo"("p_bar_id" "uuid", "p_resumo" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_hoje_sp"() RETURNS "date"
@@ -781,6 +1029,48 @@ $$;
 ALTER FUNCTION "public"."otcb_recalcular_todos"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_atual record;
+  v_regra record;
+  v_trecho text := nullif(left(trim(coalesce(p_trecho, '')), 300), '');
+begin
+  if p_url_fonte is null or trim(p_url_fonte) = '' then
+    raise exception 'url_fonte_obrigatoria' using errcode = '22023';
+  end if;
+
+  select id, sinal, tipo, trecho, data_evidencia into v_atual
+    from public.otcb_evidencias
+   where bar_id = p_bar_id and assunto = p_assunto and url_fonte = p_url_fonte;
+
+  if v_atual.id is null then
+    insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, url_fonte, trecho, data_evidencia, peso, meia_vida_dias)
+    values (p_bar_id, p_assunto, p_sinal, p_tipo, 'garimpo', p_url_fonte, v_trecho, p_data_evidencia, 0, 1);
+    return 'criada';
+  end if;
+
+  if v_atual.sinal = p_sinal and v_atual.tipo = p_tipo and v_atual.trecho is not distinct from v_trecho
+     and v_atual.data_evidencia = p_data_evidencia then
+    return 'igual';
+  end if;
+
+  select * into v_regra from public.otcb_regra_evidencia(p_tipo, p_assunto, p_sinal);
+  update public.otcb_evidencias
+     set sinal = p_sinal, tipo = p_tipo, trecho = v_trecho, data_evidencia = p_data_evidencia,
+         peso = v_regra.peso, meia_vida_dias = v_regra.meia_vida_dias
+   where id = v_atual.id;
+  perform public.otcb_recalcular_bar(p_bar_id);
+  return 'atualizada';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_regra_evidencia"("p_tipo" "public"."otcb_tipo_evidencia", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", OUT "peso" numeric, OUT "meia_vida_dias" integer) RETURNS "record"
     LANGUAGE "plpgsql" IMMUTABLE
     SET "search_path" TO ''
@@ -837,16 +1127,7 @@ begin
     raise exception 'dados_invalidos' using errcode = 'P0001';
   end if;
 
-  -- Regra 11.16 (2): mesmo bar se a até 80 m e com nome parecido.
-  select b.id into v_bar
-    from public.otcb_bares b
-   where b.excluido_em is null
-     and b.latitude between p_latitude - 0.001 and p_latitude + 0.001
-     and b.longitude between p_longitude - 0.001 and p_longitude + 0.001
-     and public.otcb_distancia_metros(p_latitude, p_longitude, b.latitude::float8, b.longitude::float8) <= 80
-     and extensions.similarity(public.otcb_normalizar(b.nome), public.otcb_normalizar(v_nome)) >= 0.5
-   order by public.otcb_distancia_metros(p_latitude, p_longitude, b.latitude::float8, b.longitude::float8)
-   limit 1;
+  v_bar := public.otcb_casar_bar(v_nome, p_latitude, p_longitude);
 
   if v_bar is not null then
     perform public.otcb_inserir_confirmacao(v_uid, v_bar, 'tem_brahma',
@@ -1498,14 +1779,49 @@ GRANT ALL ON FUNCTION "public"."otcb_anonimizar_evidencias"("p_usuario" "uuid") 
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_atualizar_coordenadas"("p_bar_id" "uuid", "p_latitude" double precision, "p_longitude" double precision) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_atualizar_coordenadas"("p_bar_id" "uuid", "p_latitude" double precision, "p_longitude" double precision) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double precision, "p_longitude" double precision) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double precision, "p_longitude" double precision) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_bares_para_coordenadas"("p_limite" integer, "p_excluir" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_bares_para_coordenadas"("p_limite" integer, "p_excluir" "uuid"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_bares_para_resumo"("p_limite" integer, "p_excluir" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_bares_para_resumo"("p_limite" integer, "p_excluir" "uuid"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_bares_para_revisita"("p_limite" integer, "p_excluir" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_bares_para_revisita"("p_limite" integer, "p_excluir" "uuid"[]) TO "service_role";
 
 
 
 REVOKE ALL ON FUNCTION "public"."otcb_buscar_bares"("p_latitude" double precision, "p_longitude" double precision, "p_raio_metros" integer, "p_texto" "text", "p_bairro" "text", "p_tem_balcao" boolean, "p_transmite_jogos" boolean, "p_classico" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_buscar_bares"("p_latitude" double precision, "p_longitude" double precision, "p_raio_metros" integer, "p_texto" "text", "p_bairro" "text", "p_tem_balcao" boolean, "p_transmite_jogos" boolean, "p_classico" boolean) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."otcb_buscar_bares"("p_latitude" double precision, "p_longitude" double precision, "p_raio_metros" integer, "p_texto" "text", "p_bairro" "text", "p_tem_balcao" boolean, "p_transmite_jogos" boolean, "p_classico" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_casar_bar"("p_nome" "text", "p_latitude" double precision, "p_longitude" double precision) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_casar_bar"("p_nome" "text", "p_latitude" double precision, "p_longitude" double precision) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_casar_ou_criar_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_place_id" "text", "p_criar" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_casar_ou_criar_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_place_id" "text", "p_criar" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_configurar_garimpo"("p_url_funcoes" "text", "p_segredo" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_configurar_garimpo"("p_url_funcoes" "text", "p_segredo" "text") TO "service_role";
 
 
 
@@ -1552,6 +1868,26 @@ GRANT ALL ON FUNCTION "public"."otcb_distancia_metros"("lat1" double precision, 
 REVOKE ALL ON FUNCTION "public"."otcb_e_admin"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_e_admin"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."otcb_e_admin"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_garimpo_disparar"("p_modo" "text", "p_execucao_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_garimpo_disparar"("p_modo" "text", "p_execucao_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_garimpo_iniciar"("p_tipo" "public"."otcb_tipo_execucao") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_garimpo_iniciar"("p_tipo" "public"."otcb_tipo_execucao") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_garimpo_uso_mes"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_garimpo_uso_mes"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_gravar_resumo"("p_bar_id" "uuid", "p_resumo" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_gravar_resumo"("p_bar_id" "uuid", "p_resumo" "text") TO "service_role";
 
 
 
@@ -1606,6 +1942,11 @@ GRANT ALL ON FUNCTION "public"."otcb_recalcular_bar_da_evidencia"() TO "service_
 
 REVOKE ALL ON FUNCTION "public"."otcb_recalcular_todos"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_recalcular_todos"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) TO "service_role";
 
 
 

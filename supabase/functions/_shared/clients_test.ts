@@ -78,3 +78,12 @@ Deno.test("firecrawl: 403 no scrape é site bloqueado, falha só do item (não �
   const e401 = await assertRejects(() => createFirecrawlClient("fc-k", fakeFetch("{}", 401)).scrape("https://x.test"), ExternalServiceError);
   assertEquals(e401.fatal, true);
 });
+
+Deno.test("google: 400 com API_KEY_INVALID é fatal (chave inválida); outros 400 não", async () => {
+  // Achado do verifier no 8.3: o Google responde 400 (não 401/403) para chave inválida.
+  const corpo = JSON.stringify({ error: { code: 400, status: "INVALID_ARGUMENT", details: [{ reason: "API_KEY_INVALID" }] } });
+  const e = await assertRejects(() => createGoogleClient("k", fakeFetch(corpo, 400)).detailsBasic("x"), ExternalServiceError);
+  assertEquals(e.fatal, true);
+  const outro = await assertRejects(() => createGoogleClient("k", fakeFetch(JSON.stringify({ error: { status: "INVALID_ARGUMENT" } }), 400)).detailsBasic("x"), ExternalServiceError);
+  assertEquals(outro.fatal, false);
+});

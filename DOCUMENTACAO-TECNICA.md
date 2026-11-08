@@ -1,10 +1,10 @@
 # OTCB — Documentação técnica
 
-Este documento descreve o sistema **como ele está implementado** (spec seção 19) e é atualizado no mesmo commit de cada mudança. Estado atual: épicos 8.0, 8.1 e 8.2.
+Este documento descreve o sistema **como ele está implementado** (spec seção 19) e é atualizado no mesmo commit de cada mudança. Estado atual: épicos 8.0 a 8.3.
 
 O banco é o Supabase "BANCO DE TESTE" (`jeesdmfcrmhyufwzwzwt`), compartilhado com outros apps. Por isso todo objeto do OTCB leva o prefixo `otcb_`.
 
-Extensões usadas, liberadas pelo Alexandre: `pg_trgm` e `unaccent` (no schema `extensions`) e `pg_cron`.
+Extensões usadas, liberadas pelo Alexandre: `pg_trgm`, `unaccent` e `pg_net` (no schema `extensions`) e `pg_cron`. Os segredos do cron (`otcb_url_funcoes`, `otcb_cron_secret`) ficam no Vault.
 
 ## 1. Modelo de dados
 
@@ -158,14 +158,32 @@ Todas valem só para `authenticated` e usam `auth.uid()`.
 - fotos: update só em `excluido_em`;
 - opiniões: update só em `status` e `motivo_ocultacao`, liberado pelo RLS apenas para o admin.
 
+### Funções do garimpo (épico 8.3; todas service-only)
+
+| Nome | O que faz |
+|---|---|
+| `otcb_casar_bar(nome, lat, lng)` | Regra 11.16 (2): bar a até 80 m com trigramas ≥ 0,5. Também usada por `otcb_sugerir_bar`. |
+| `otcb_casar_ou_criar_bar(...)` | 11.16 completa: mesmo `place_id`, ou casamento por distância e nome (grava o `place_id` se faltava), senão cria o bar `incerto` quando `p_criar`. |
+| `otcb_registrar_evidencia_garimpo(...)` | Insere, ou atualiza pela chave `(bar, assunto, url_fonte)`: sinal, trecho, data e peso pela 11.1, depois recalcula o bar. Devolve `criada`, `atualizada` ou `igual`, e nunca duplica. O `status_google` usa uma URL fixa por lugar, então o último status do Google prevalece. |
+| `otcb_bares_para_revisita / _coordenadas / _resumo(limite, excluir)` | Seleção de trabalho: visita há mais de 7 dias (data do `status_google`), com prioridade para `incerto` e para bares só com a semente; coordenadas com mais de 25 dias (11.10); critério do resumo (11.8). |
+| `otcb_atualizar_coordenadas`, `otcb_gravar_resumo` | Gravam coordenadas e o resumo (até 400 caracteres). |
+| `otcb_garimpo_iniciar(tipo)` | 12.3: execução parada há mais de 2 h vira `falhou`; se já há uma em andamento, devolve nulo (a Edge Function responde 409). |
+| `otcb_garimpo_uso_mes()` | Soma o uso do mês por recurso a partir do `cursor` das execuções (11.17). |
+| `otcb_configurar_garimpo(url, segredo)` | Grava a URL e o segredo no Vault. Chamada por `npm run garimpo:configurar`. |
+| `otcb_garimpo_disparar(modo, execucao?)` | `net.http_post` para `otcb-garimpo` com o cabeçalho `x-otcb-cron`. Usada pelos jobs e pelo reagendamento entre lotes. |
+
 ### Jobs do `pg_cron` (horários em UTC; São Paulo é UTC−3)
 
 | Job | Quando | Chama |
 |---|---|---|
 | `otcb_cron_recalculo` | 06:00 UTC (03:00 SP) | `otcb_recalcular_todos()` |
 | `otcb_cron_limpeza` | 06:30 UTC (03:30 SP) | `otcb_limpeza_diaria()` |
+| `otcb_cron_revisita` | 07:00 UTC (04:00 SP) | `otcb_garimpo_disparar('revisita')` |
+| `otcb_cron_coordenadas` | 07:30 UTC (04:30 SP) | `otcb_garimpo_disparar('coordenadas')` |
+| `otcb_cron_resumos` | 08:00 UTC (05:00 SP) | `otcb_garimpo_disparar('resumos')` |
+| `otcb_cron_descoberta` | segunda 05:00 UTC (02:00 SP) | `otcb_garimpo_disparar('descoberta')` |
 
-Os jobs que chamam Edge Functions (revisita, coordenadas, resumos, jogos e descoberta) entram no épico 8.3.
+O `otcb_cron_jogos` entra no épico 8.9.
 
 ## 4. Mapa tela → tabelas e funções
 
@@ -216,6 +234,52 @@ Os jobs que chamam Edge Functions (revisita, coordenadas, resumos, jogos e desco
 - Respostas: 200 `{ok: true}`; 401 sem JWT válido; 405 fora de POST; 500 `{error: 'falha_exclusao'}`, sem dado pessoal no log.
 - No app, `deleteAccountAndSignOut` também trata o `error` que o supabase-js devolve em vez de lançar.
 
+### Edge Function `otcb-garimpo` (13.6; épico 8.3)
+
+**Autenticação e entrada:**
+- O gateway não exige JWT (`verify_jwt = false` em `config.toml`). A função exige o cabeçalho `x-otcb-cron` igual ao `OTCB_CRON_SECRET`, comparado em tempo constante; sem ele, 401.
+- `POST { modo, execucao_id?, bairros? }`. O parâmetro `bairros` serve só para rodada de teste da descoberta.
+- Responde 202 e processa o lote em segundo plano (`EdgeRuntime.waitUntil`).
+
+**Lote:**
+- No máximo 20 itens **e** cerca de 100 s; tetos da 11.17 por execução e por mês (`tetos.ts`).
+- Teto atingido: termina `concluida`, com `{motivo: 'teto_atingido', recurso, escopo}` em `erros`.
+- Falha de um item: entra em `erros` (`{item, erro}`, sanitizado) e o lote segue.
+- Erro fatal termina `falhou`. São fatais: Google 401/402/403, Firecrawl 401/402, Claude 401/403 ou falta de crédito. O **403 do Firecrawl no scrape** é site bloqueado e conta como falha do item.
+- Se sobra trabalho, salva a posição no `cursor` e se reagenda via `otcb_garimpo_disparar`.
+- Ao concluir, o `cursor` guarda só `{uso}`, o uso por recurso que serve de base para os tetos mensais.
+
+**Modos:**
+- **descoberta:**
+  - para cada bairro da 11.15, faz um Google Text Search ("bar chopp Brahma {bairro} São Paulo") e uma Firecrawl search;
+  - **lugar:** busca até 5 avaliações (Place Details com reviews), classifica cada uma com o Claude e grava `avaliacao_google` (a `url_fonte` traz o id da avaliação; a data é a da avaliação);
+  - **página:** faz o scrape, classifica, localiza no Google pelo `nome_bar` + bairro e grava `pagina_web` ou `cardapio_site`;
+  - o bar novo só nasce com evidência positiva de Brahma.
+- **revisita:** consulta o status no Google (`CLOSED_PERMANENTLY` → `fechado` na hora; OPERATIONAL fica registrado como visita; `CLOSED_TEMPORARILY` é ignorado) e reclassifica até 2 URLs conhecidas.
+- **coordenadas:** renova lat/lng (11.10).
+- **resumos:** gera o resumo das opiniões publicadas (11.8).
+
+**Classificação (13.6):**
+- `claude-haiku-5-5` pelo SDK oficial, com saída em JSON schema, validação local e 1 nova tentativa (12.5).
+- `sim` → evidência positiva; `nao` com outra marca de chopp num cardápio → negativa; `incerto` → nada.
+- A data é a do conteúdo, ou a da coleta − 90 dias.
+- Cardápio não gera `transmite_jogos`; avaliação do Google só gera positivas (tabela 11.1).
+
+**Segredos e logs:**
+- Os segredos vivem só no ambiente da função.
+- Toda mensagem de erro e de log passa por `sanitize` (chaves conhecidas, padrões de chave, `Bearer`, query strings).
+- O log do gateway do Supabase registra só o **prefixo** da chave de serviço (`authorization.prefix`, 15 caracteres), comportamento da plataforma.
+
+**Rodada real de 08/11/2026:**
+
+| Execução | Resultado |
+|---|---|
+| Descoberta em Pinheiros | 1 bar novo (Bar do Juarez); evidências com `url_fonte` e `trecho`. A 1ª rodada falhou por um 403 do Firecrawl, que foi corrigido. |
+| Revisita | 34 bares em 2 lotes, reagendados via `pg_net`; 33 `status_google`, sem erros. |
+| 2ª descoberta | Nenhuma evidência duplicada (41/41 distintas); 3 evidências web novas; 2 páginas com erro registrado como item (Instagram 403, site da marca 500). |
+
+Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 classificações.
+
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
 1. Lê `supabase/seed/estabelecimentos_otcb_antigo.csv`, ignorando linhas sem nome.
@@ -254,4 +318,9 @@ Os jobs que chamam Edge Functions (revisita, coordenadas, resumos, jogos e desco
 | 5.2 × 6.1 ("admin apaga qualquer foto") | Sem política extra. | A 6.1 não a prevê; o admin opera pelo Studio (5.1). |
 | 11.2 (1), janela de 30 dias | Aplicada só ao "fechou" de usuários; o `status_google` fechado vale a qualquer tempo. | Leitura do texto da 11.2 (caso I da 11.2.1). |
 | Semente | O relatório tem `ja_existentes` e `sementes_completadas` (recuperação de importação interrompida). | Idempotência e atomicidade sem transação entre chamadas. |
+| `status_google` com URL fixa (8.3) | O último status do Google prevalece: se ele volta a dizer OPERATIONAL, o fechamento cai. | Resolve o caso que a 11.2 não trata e que ficou pendente no 8.2. |
+| Contadores por recurso no `cursor` (8.3) | Ao concluir, o `cursor` guarda `{uso}` em vez de ficar nulo. | A 7.2 só tem `chamadas_google` e `chamadas_firecrawl`, mas a 11.17 tem tetos mensais por SKU. |
+| Descoberta cria bar só com evidência positiva de Brahma (8.3) | — | Evita encher a base de bares sem relação com o produto. |
+| Uma página com vários bares (8.3) | A classificação 13.6 devolve um único `nome_bar`; listas tipo "10 bares com Brahma" geram evidência para um bar só. | Limitação do contrato 13.6. |
+| `otcb-garimpo` com `verify_jwt = false` (8.3) | A autenticação é o segredo `x-otcb-cron`. | O `pg_net` não manda JWT; a 13.6 define o segredo próprio. |
 | **Pendente para o 8.4/8.8** | O apelido dos outros usuários nas opiniões é público (seção 20), mas o RLS de perfis só deixa ver o próprio. | Vai precisar de uma função ou view nesses épicos. |

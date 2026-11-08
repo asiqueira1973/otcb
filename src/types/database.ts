@@ -243,15 +243,42 @@ isOneToOne: false
 "otcb_anonimizar_evidencias":
 { Args: { "p_usuario": string }; Returns: number
                            },
+"otcb_atualizar_coordenadas":
+{ Args: { "p_bar_id": string,"p_latitude": number,"p_longitude": number }; Returns: undefined
+                           },
 "otcb_bar_mais_proximo":
 { Args: { "p_latitude": number,"p_longitude": number }; Returns: {
               "bar_id": string,"distancia_metros": number
+            }[]
+                           },
+"otcb_bares_para_coordenadas":
+{ Args: { "p_excluir"?: (string)[],"p_limite": number }; Returns: {
+              "bar_id": string,"google_place_id": string
+            }[]
+                           },
+"otcb_bares_para_resumo":
+{ Args: { "p_excluir"?: (string)[],"p_limite": number }; Returns: {
+              "bar_id": string,"nome": string
+            }[]
+                           },
+"otcb_bares_para_revisita":
+{ Args: { "p_excluir"?: (string)[],"p_limite": number }; Returns: {
+              "bairro": string,"bar_id": string,"google_place_id": string,"nome": string,"urls": (string)[]
             }[]
                            },
 "otcb_buscar_bares":
 { Args: { "p_bairro"?: string,"p_classico"?: boolean,"p_latitude"?: number,"p_longitude"?: number,"p_raio_metros"?: number,"p_tem_balcao"?: boolean,"p_texto"?: string,"p_transmite_jogos"?: boolean }; Returns: {
               "bairro": string,"bar_id": string,"classico": boolean,"confirmacoes_60_dias": number,"distancia_metros": number,"endereco": string,"latitude": number,"longitude": number,"nome": string,"nota_colarinho_media": number,"nota_opinioes_media": number,"qtd_opinioes": number,"resumo_opinioes": string,"status": Database["public"]['Enums']["otcb_status_bar"],"tem_balcao": boolean,"transmite_jogos": boolean,"ultima_confirmacao_em": string
             }[]
+                           },
+"otcb_casar_bar":
+{ Args: { "p_latitude": number,"p_longitude": number,"p_nome": string }; Returns: string
+                           },
+"otcb_casar_ou_criar_bar":
+{ Args: { "p_bairro": string,"p_criar": boolean,"p_endereco": string,"p_latitude": number,"p_longitude": number,"p_nome": string,"p_place_id": string }; Returns: Json
+                           },
+"otcb_configurar_garimpo":
+{ Args: { "p_segredo": string,"p_url_funcoes": string }; Returns: undefined
                            },
 "otcb_confirmar_bar":
 { Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_bar_id": string,"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"] }; Returns: Json
@@ -267,6 +294,18 @@ isOneToOne: false
                            },
 "otcb_e_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"otcb_garimpo_disparar":
+{ Args: { "p_execucao_id"?: string,"p_modo": string }; Returns: number
+                           },
+"otcb_garimpo_iniciar":
+{ Args: { "p_tipo": Database["public"]['Enums']["otcb_tipo_execucao"] }; Returns: string
+                           },
+"otcb_garimpo_uso_mes":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"otcb_gravar_resumo":
+{ Args: { "p_bar_id": string,"p_resumo": string }; Returns: boolean
                            },
 "otcb_hoje_sp":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -288,6 +327,9 @@ isOneToOne: false
                            },
 "otcb_recalcular_todos":
 { Args: Record<PropertyKey, never>; Returns: number
+                           },
+"otcb_registrar_evidencia_garimpo":
+{ Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_bar_id": string,"p_data_evidencia": string,"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"],"p_tipo": Database["public"]['Enums']["otcb_tipo_evidencia"],"p_trecho": string,"p_url_fonte": string }; Returns: string
                            },
 "otcb_regra_evidencia":
 { Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"],"p_tipo": Database["public"]['Enums']["otcb_tipo_evidencia"] }; Returns: Record<string, unknown>

@@ -298,3 +298,21 @@ Deno.test("data da evidência (11.1): data do conteúdo, senão coleta − 90 di
   assertEquals(tipoDaPagina("https://x.test/menu", ""), "cardapio_site");
   assertEquals(tipoDaPagina("https://x.test/blog", "10 bares"), "pagina_web");
 });
+
+Deno.test("descoberta: falha persistente na busca de um bairro não trava a execução (critério 5 / 12.5)", async () => {
+  // Achado do verifier no 8.3: com o Firecrawl search sempre em 500, o mesmo bairro era reagendado até o teto.
+  const db = new FakeDb();
+  const buscasGoogle: string[] = [];
+  const s = servicos(db, {
+    google: { searchText: (q) => { buscasGoogle.push(q); return Promise.resolve(q.startsWith("bar chopp Brahma") ? [lugar(`p-${buscasGoogle.length}`)] : []); } },
+    firecrawl: { search: () => Promise.reject(new ExternalServiceError("firecrawl", 500, false, "search")) },
+  });
+  const id = (await db.iniciarExecucao("descoberta"))!;
+  db.execucoes.get(id)!.cursor = { bairros: ["Pinheiros", "Moema"] };
+  const r = await executarLote(id, "descoberta", s, () => AGORA);
+  assertEquals(r.status, "concluida");
+  assertEquals(db.disparos.length, 0);
+  assertEquals(buscasGoogle.filter((q) => q.startsWith("bar chopp Brahma")).length, 2, "cada bairro buscado uma vez");
+  assertEquals(db.bares.length, 2, "o resultado do Google é aproveitado mesmo com o Firecrawl falhando");
+  assertEquals(db.execucoes.get(id)!.erros.filter((e) => String(e.etapa).startsWith("busca:")).length, 2);
+});
