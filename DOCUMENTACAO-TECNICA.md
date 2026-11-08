@@ -647,4 +647,4 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Falha em "Apagar meus dados" (8.10) | A sessão e os dados do aparelho ficam; aparece a 15.9. | O spec não trata a falha. Descartar a sessão faria a pessoa achar que apagou com os dados ainda no servidor. |
 | Termos e Privacidade (8.10) | Telas do app com texto embutido, e não links externos. | Funcionam sem rede; a URL pública para as lojas fica para o 8.11. |
 | Configuração em `app.config.ts` sem a marca (8.11) | Os textos de permissão do sistema dizem "chopp", sem a marca. | O hook e o teste de marca cobrem `app.config.ts`; o texto de permissão aparece também na revisão da loja. |
-| Disponibilidade na loja (8.11) | Sugestão: só Brasil. | O conteúdo cobre só São Paulo (anti-escopo "app nacional"); o padrão da Dab Lab é todos os países, e a escolha final é do Alexandre. |
+| Disponibilidade na loja (8.11) | Só Brasil (decisão do Alexandre). | O conteúdo cobre só São Paulo (anti-escopo "app nacional"); o padrão da Dab Lab é todos os países. |

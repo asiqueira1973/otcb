@@ -46,6 +46,10 @@ Sem a marca de cerveja em nenhum campo (nota sobre a marca do spec; hook `guard-
 
 Não coletados: informações pessoais (nome, e-mail, telefone), financeiras, saúde, contatos, histórico de navegação, IDs de publicidade, diagnóstico.
 
+## Países
+
+- Só Brasil (decisão do Alexandre, 8.11).
+
 ## Primeira versão
 
 - **Faixa:** teste interno primeiro (`eas submit` com `track: internal`, `releaseStatus: draft`), depois produção.

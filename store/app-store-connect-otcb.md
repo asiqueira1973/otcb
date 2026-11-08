@@ -112,7 +112,7 @@ Não coletados: Contact Info, Health & Fitness, Financial Info, Browsing History
 ## Pricing and Availability
 
 - **Preço:** Grátis (Tier 0). Sem In-App Purchase.
-- **Disponibilidade:** Brasil (o conteúdo cobre só a cidade de São Paulo; spec, seção 1 — anti-escopo "app nacional"). Se preferir o padrão Dab Lab "All Countries or Regions", não há impedimento técnico.
+- **Disponibilidade:** só Brasil (decisão do Alexandre, 8.11; o conteúdo cobre a cidade de São Paulo).
 
 ---
 
