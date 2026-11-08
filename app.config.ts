@@ -2,7 +2,7 @@ import type { ExpoConfig } from 'expo/config';
 
 // Configuração do app (épico 8.11; 24.8: com.dablab.otcb; conta Expo alexsiq, padrão da Dab Lab).
 // Nome na loja e no aparelho é só "OTCB" (nota sobre a marca; hook guard-store-brand.sh). Só iPhone,
-// sem iPad (decisão do Alexandre no 8.11). Criptografia: só HTTPS padrão (App Encryption: isento).
+// sem iPad (decisão do Alexandre no 8.11). Número de build: no EAS (appVersionSource remote). Criptografia: só HTTPS padrão (App Encryption: isento).
 const config: ExpoConfig = {
   name: 'OTCB',
   slug: 'otcb',
@@ -14,13 +14,11 @@ const config: ExpoConfig = {
   scheme: 'otcb',
   ios: {
     bundleIdentifier: 'com.dablab.otcb',
-    buildNumber: '1',
     supportsTablet: false,
     config: { usesNonExemptEncryption: false },
   },
   android: {
     package: 'com.dablab.otcb',
-    versionCode: 1,
     adaptiveIcon: {
       backgroundColor: '#1F4AA8',
       foregroundImage: './assets/android-icon-foreground.png',
