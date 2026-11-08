@@ -231,6 +231,7 @@ O `otcb_cron_jogos` entra no épico 8.9.
 | T6 Ficha do bar | `src/features/bares/BarSheet.tsx` | `otcb_detalhes_bar`, `otcb_opinioes_do_bar` | Links de rota e Uber (13.2) |
 | Cards de entrada (8.5) | `src/features/cards/` | `otcb_opinioes` (a própria) | `otcb_confirmar_bar`, `otcb_sugerir_bar`, `otcb_registrar_card`, insert em `otcb_denuncias`, Edge Function `otcb-opinioes` |
 | T7 Câmera (8.6) | `app/camera.tsx` + `src/features/colarinhometro/` | — | Edge Function `otcb-colarinhometro` |
+| T8 Passaporte (8.7) | `app/passaporte.tsx` + `src/features/passaporte/` | `otcb_meu_passaporte` | — |
 | T9 Perfil (mínimo) | `app/perfil.tsx` | — | `delete` em `otcb_mensagens` (próprias) |
 
 ## 5. Lógica por tela, Edge Function e script
@@ -455,6 +456,24 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - tempo de 2,7 a 4,1 s (6,5 s com a função fria);
   - os dados de teste foram limpos.
 
+### T8 Passaporte (8.7; regra 11.11)
+- **Dados:** a tela só mostra o que `otcb_meu_passaporte` devolve. A última resposta fica em cache no aparelho (`otcb_passaporte_cache`) e é mostrada com aviso quando não há rede.
+- **O que aparece:**
+  - "N bares carimbados";
+  - grade de carimbos de borracha (16.4), em que tocar abre a Ficha; os cards da Ficha voltam para o chat como mensagens locais;
+  - coleções dos bairros onde já há carimbo, com conquistados primeiro;
+  - coleção Clássicos, só quando `total > 0` (25.5 adiada pelo Alexandre: sem clássicos por enquanto);
+  - os 5 selos, com progresso e nível do Explorador.
+- **Princípio 3:** nenhum texto conta chopp ou fotos; o "Olho clínico" fala em "bares".
+- **A7:** detecta o selo novo comparando com `otcb_selos_vistos` no aparelho. Na primeira abertura só memoriza; depois anima e dispara `otcb_selo_ganho`.
+- **A11:** a Bolacha gira enquanto carrega e ao puxar para atualizar.
+- **Vazio:** a 15.5, com um botão para o Colarinhômetro.
+- **Checagem real (08/11/2026):**
+  - 3 bares em 3 bairros (2 pelo Colarinhômetro e 1 inserido com data de ontem, por causa do limite de 2 por dia);
+  - os números do RPC conferem com a 11.11;
+  - apagar a foto manteve os carimbos;
+  - os dados foram limpos.
+
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
 1. Lê `supabase/seed/estabelecimentos_otcb_antigo.csv`, ignorando linhas sem nome.
@@ -520,4 +539,6 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | A6 sem Lottie (8.6) | Carimbo e confete feitos com o Reanimated. | Mesma decisão da A9. |
 | Selo novo no resultado (8.6) | `otcb_resultado_foto` não diz se saiu selo. | Fica para o Passaporte (8.7), que calcula os selos. |
 | Mensagens locais no aparelho (8.6) | Resultado do Colarinhômetro e cards da Ficha guardados no AsyncStorage por 30 dias. | O bloco de resultado não é gravado em `otcb_mensagens`, porque só o agente grava lá (6.1). |
+| Selo e foto apagada (8.7) | O selo "Olho clínico" continua contando a foto apagada pelo dono. | A 11.11 não trata o caso; segue o critério 3 do 8.7, em que a conquista não regride, como o carimbo. |
+| Clássicos (8.7) | A coleção só aparece quando há bar clássico. | A 25.5 foi adiada pelo Alexandre (começar sem clássicos). |
 | Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |
