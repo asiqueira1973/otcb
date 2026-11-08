@@ -32,7 +32,7 @@ Se for chopp, dê notas de 0 a 10 (uma casa decimal):
 - nota_cremosidade: espuma fina e densa vale mais que bolhas grandes.
 - nota_copo: copo limpo, apropriado para chopp, sem espuma escorrendo.
 - nota_gelado: sinais visuais de chopp gelado (copo suado, espuma firme).
-comentario: até 120 caracteres, em português do Brasil, bem-humorado, sobre a tirada; nunca incentive beber mais, rodadas ou quantidade; não cite marcas nem pessoas.
+comentario: uma frase curta, de no máximo 100 caracteres, em português do Brasil, bem-humorado, sobre a tirada; nunca incentive beber mais, rodadas ou quantidade; não cite marcas nem pessoas.
 pessoa_identificavel: true se aparece rosto de pessoa reconhecível.
 Responda só com o JSON pedido.`;
 
@@ -51,6 +51,17 @@ const SCHEMA = {
   },
 } as const;
 
+// Corta o comentário em até 120 caracteres (13.5) no fim de uma palavra, com reticências (bug visto na
+// checagem real: o modelo passa de 120 e o corte caía no meio da palavra). Recebe: texto. Devolve: texto ≤ 120.
+export function cortarComentario(texto: string): string {
+  const t = texto.trim().replace(/\s+/g, " ");
+  if (t.length <= 120) return t;
+  const ate = t.slice(0, 119);
+  const espaco = ate.lastIndexOf(" ");
+  const base = (espaco > 60 ? ate.slice(0, espaco) : ate).replace(/[\s,;:–-]+$/, "");
+  return `${base}…`;
+}
+
 const nota = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 10;
 
 // Valida o contrato 13.5. Recebe: JSON. Devolve: avaliação limpa (notas com 1 casa, comentário ≤ 120) ou null.
@@ -63,7 +74,7 @@ export function validarAvaliacao(v: unknown): Avaliacao | null {
   return {
     e_chopp: o.e_chopp,
     nota_altura: um(o.nota_altura), nota_cremosidade: um(o.nota_cremosidade), nota_copo: um(o.nota_copo), nota_gelado: um(o.nota_gelado),
-    comentario: o.comentario.trim().slice(0, 120),
+    comentario: cortarComentario(o.comentario),
     pessoa_identificavel: o.pessoa_identificavel,
   };
 }
