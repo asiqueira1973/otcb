@@ -14,5 +14,5 @@ export const TEXTOS = {
   // Perguntas do card pergunta_confirmacao (8.5; proposto 8.5): montadas pelo servidor, não pelo modelo.
   perguntaTemBrahma: (bar: string) => `O ${bar} ainda tem chopp Brahma?`,
   perguntaJogos: (bar: string) => `O ${bar} passa jogo?`,
-  perguntaFuncionamento: (bar: string) => `O ${bar} continua aberto?`,
+  perguntaFuncionamento: (bar: string) => `O ${bar} fechou?`,
 } as const;

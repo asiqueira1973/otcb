@@ -13,14 +13,17 @@ type Props = { chave: string; barId: string; assunto: Assunto; pergunta: string 
 
 // Card pergunta_confirmacao (8.5; 13.2): um toque grava a evidência confirmacao_usuario via
 // otcb_confirmar_bar (critério 1). Botões da tabela da 8.5: "Tem sim" / "Não tem mais" / "Fechou" para
-// Brahma e funcionamento; "Passa" / "Não passa" para jogos. Repetida no dia → 15.8 (critério 2).
+// Brahma; só "Fechou" para funcionamento (o banco só aceita esse sinal, e a pergunta é "fechou?");
+// "Passa" / "Não passa" para jogos. Repetida no dia → 15.8 (critério 2).
 // Recebe: chave do card, bar, assunto e a pergunta (montada pelo servidor). Devolve: o card.
 export function ConfirmationCard({ chave, barId, assunto, pergunta }: Props) {
   const { estado, enviar } = useCardSubmit(chave);
   const travado = estado.fase !== 'editando' && estado.fase !== 'erro';
 
   const opcoes: { rotulo: string; assunto: Assunto; sinal: 'positivo' | 'negativo' | 'fechado' }[] =
-    assunto === 'transmite_jogos'
+    assunto === 'funcionamento'
+      ? [{ rotulo: copy.cards.closed, assunto, sinal: 'fechado' }]
+      : assunto === 'transmite_jogos'
       ? [
           { rotulo: copy.cards.shows, assunto, sinal: 'positivo' },
           { rotulo: copy.cards.doesntShow, assunto, sinal: 'negativo' },

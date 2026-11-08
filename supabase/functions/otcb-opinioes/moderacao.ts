@@ -43,31 +43,39 @@ export function validarVeredito(v: unknown): Veredito | null {
   return { permitida: o.permitida, motivo: o.motivo as Veredito["motivo"] };
 }
 
-// Cria o moderador real. Recebe: chave. Devolve: Moderador (timeout curto; 1 nova tentativa do SDK).
-export function criarModerador(apiKey: string): Moderador {
-  const client = new Anthropic({ apiKey, maxRetries: 1, timeout: 15_000 });
+// Chamada ao modelo (injetável nos testes, seção 22).
+export type CriarMensagem = (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
+
+// Cria o moderador real. Recebe: chave e, nos testes, a chamada simulada. Devolve: Moderador.
+// Saída fora do contrato ganha 1 nova tentativa (12.5); erro de rede/HTTP é repetido pelo SDK (maxRetries 1).
+export function criarModerador(apiKey: string, criar?: CriarMensagem): Moderador {
+  const client = criar ? null : new Anthropic({ apiKey, maxRetries: 1, timeout: 15_000 });
+  const chamar: CriarMensagem = criar ?? ((p) => client!.messages.create(p));
   return {
     async moderar(texto) {
-      let resposta: Anthropic.Message;
-      try {
-        resposta = await client.messages.create({
-          model: MODELO_MODERACAO,
-          max_tokens: 200,
-          system: SISTEMA,
-          messages: [{ role: "user", content: `<opiniao>${texto}</opiniao>` }],
-          output_config: { format: { type: "json_schema", schema: SCHEMA } },
-        } as Anthropic.MessageCreateParamsNonStreaming);
-      } catch (error) {
-        const status = error instanceof Anthropic.APIError ? error.status ?? 0 : 0;
-        throw new ModeracaoIndisponivel(`modelo_${status}`);
+      for (let tentativa = 0; tentativa < 2; tentativa++) {
+        let resposta: Anthropic.Message;
+        try {
+          resposta = await chamar({
+            model: MODELO_MODERACAO,
+            max_tokens: 200,
+            system: SISTEMA,
+            // "</opiniao>" dentro do texto não fecha a etiqueta (problema 3 do verifier).
+            messages: [{ role: "user", content: `<opiniao>${texto.replaceAll("</opiniao>", "</ opiniao>")}</opiniao>` }],
+            output_config: { format: { type: "json_schema", schema: SCHEMA } },
+          } as Anthropic.MessageCreateParamsNonStreaming);
+        } catch (error) {
+          const status = error instanceof Anthropic.APIError ? error.status ?? 0 : 0;
+          throw new ModeracaoIndisponivel(`modelo_${status}`);
+        }
+        // Recusa do próprio modelo de segurança: trata como texto não publicável.
+        if (resposta.stop_reason === "refusal") return { permitida: false, motivo: "ofensa" };
+        const saida = resposta.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
+        try {
+          const v = validarVeredito(JSON.parse(saida));
+          if (v) return v;
+        } catch { /* nova tentativa */ }
       }
-      // Recusa do próprio modelo de segurança: trata como texto não publicável.
-      if (resposta.stop_reason === "refusal") return { permitida: false, motivo: "ofensa" };
-      const saida = resposta.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-      try {
-        const v = validarVeredito(JSON.parse(saida));
-        if (v) return v;
-      } catch { /* cai no erro abaixo */ }
       throw new ModeracaoIndisponivel("fora_do_contrato");
     },
   };

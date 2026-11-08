@@ -26,7 +26,8 @@ jest.mock('../../src/lib/supabase', () => ({
     },
     from: (t: string) => {
       if (t === 'otcb_denuncias') return { insert: (...a: unknown[]) => mockInsert(...a) };
-      if (t === 'otcb_perfis') return { select: () => ({ limit: () => ({ maybeSingle: () => Promise.resolve({ data: { apelido: 'eu_mesmo' } }) }) }) };
+      // Mock da consulta do apelido próprio, filtrada pelo id (correção do problema 5 do verifier).
+      if (t === 'otcb_perfis') return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { apelido: 'eu_mesmo' } }) }) }) };
       return { select: () => ({ eq: () => ({ maybeSingle: () => mockOpiniaoBar(), eq: () => ({ maybeSingle: () => mockOpiniaoBar() }) }) }) };
     },
   },

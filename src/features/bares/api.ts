@@ -19,11 +19,14 @@ export async function fetchOpinions(barId: string, pagina = 0): Promise<Opiniao[
   return (data ?? []) as Opiniao[];
 }
 
-// Apelido da própria pessoa (RLS: só o próprio perfil), para não oferecer "Denunciar" na própria opinião.
+// Apelido da própria pessoa, para não oferecer "Denunciar" na própria opinião.
 // Devolve: o apelido ou '' se não achar.
 export async function apelidoProprio(): Promise<string> {
   try {
-    const { data } = await supabase.from('otcb_perfis').select('apelido').limit(1).maybeSingle();
+    // Filtra pelo próprio id: para o admin, o RLS deixa ler todos os perfis.
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return '';
+    const { data } = await supabase.from('otcb_perfis').select('apelido').eq('id', u.user.id).maybeSingle();
     return data?.apelido ?? '';
   } catch {
     return '';
