@@ -13,7 +13,8 @@ export interface FirecrawlClient {
 }
 
 // Cria o cliente. Recebe: chave e fetch (injetável). Devolve: FirecrawlClient.
-// Erros viram ExternalServiceError sem a chave; 401/402/403 são fatais (chave ou crédito).
+// Erros viram ExternalServiceError sem a chave. Fatais (chave ou crédito): 401 e 402. No scrape, 403 é
+// site bloqueado/não suportado pelo Firecrawl — falha só daquele item (critério 5 do 8.3).
 export function createFirecrawlClient(apiKey: string, fetchFn: typeof fetch = fetch): FirecrawlClient {
   async function post(path: string, body: unknown): Promise<Record<string, unknown>> {
     const res = await fetchFn(`https://api.firecrawl.dev/v1/${path}`, {
@@ -23,7 +24,8 @@ export function createFirecrawlClient(apiKey: string, fetchFn: typeof fetch = fe
     });
     if (!res.ok) {
       await res.body?.cancel();
-      throw new ExternalServiceError("firecrawl", res.status, isFatalStatus(res.status), path);
+      const fatal = isFatalStatus(res.status) && !(path === "scrape" && res.status === 403);
+      throw new ExternalServiceError("firecrawl", res.status, fatal, path);
     }
     return await res.json();
   }
