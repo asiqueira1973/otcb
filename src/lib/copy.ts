@@ -231,5 +231,14 @@ export const copy = {
     passportNotice: 'Seu passaporte fica neste celular. Se reinstalar o app ou trocar de aparelho, ele não volta.',
     // 15.12
     footer: 'Beba com moderação. Se beber, não dirija.',
+    save: 'Salvar', // (proposto 8.10)
+    saved: 'Salvo.', // (proposto 8.10)
+    terms: 'Termos de uso', // T9
+    privacy: 'Política de privacidade', // T9
+    deleteData: 'Apagar meus dados', // T9
+    // 15.21 — etapa 1 (texto) e etapa 2 (botão)
+    deleteConfirm: 'Isso apaga seu apelido, fotos, carimbos, opiniões e conversa. Não dá pra desfazer.',
+    deleteAction: 'Apagar tudo',
+    deleting: 'Apagando…', // (proposto 8.10) leitor de tela durante a exclusão
   },
 } as const;
