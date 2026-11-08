@@ -27,3 +27,8 @@ npm-debug.*
 
 # Chaves de envio às lojas (8.11)
 secrets/
+
+# Pacotes de loja baixados do EAS (8.11), fora do git
+*.aab
+*.apk
+*.ipa
