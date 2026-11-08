@@ -536,3 +536,20 @@ Deno.test("verifier 8.9 (12.5): jogos em dia → nada de aviso", async () => {
   assertFalse("atualizacao_falhou" in resultado);
   assertEquals(corpo.texto, "Hoje não tem jogo do Corinthians.");
 });
+
+Deno.test("verifier 8.9 (menor): só cards com jogos desatualizados → texto padrão e o aviso", async () => {
+  const { db } = fakeDb();
+  db.jogosAtualizados = () => Promise.resolve(false);
+  db.jogos = () => Promise.resolve([
+    { jogo_id: "j1", competicao: "Brasileirão", mandante: "Corinthians", visitante: "Palmeiras", inicio: "2026-11-08T22:00:00Z" },
+  ]);
+  const { modelo } = fakeModelo([
+    usoFerramenta("t1", "jogos_de_hoje", { time: "Corinthians" }),
+    { stop_reason: "tool_use", content: [
+      { type: "tool_use", id: "t2", name: "mostrar", input: { blocos: [{ tipo: "jogos", jogo_ids: ["j1"] }] } } as Anthropic.ToolUseBlock,
+    ] },
+    textoFinal(""),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "jogo do Corinthians" }), deps(db, modelo))).json();
+  assertEquals(corpo.texto, `${TEXTOS.soCards}\n\n${TEXTOS.jogosDesatualizados}`);
+});
