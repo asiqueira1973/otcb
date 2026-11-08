@@ -324,6 +324,12 @@ isOneToOne: false
 "otcb_inserir_confirmacao":
 { Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_bar_id": string,"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"],"p_usuario": string }; Returns: undefined
                            },
+"otcb_jogos_disparar":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
+"otcb_jogos_gravar":
+{ Args: { "p_dados": Json }; Returns: Json
+                           },
 "otcb_limpeza_diaria":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },

@@ -808,6 +808,60 @@ $$;
 ALTER FUNCTION "public"."otcb_inserir_confirmacao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_jogos_disparar"() RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_url text;
+  v_segredo text;
+begin
+  select decrypted_secret into v_url from vault.decrypted_secrets where name = 'otcb_url_funcoes';
+  select decrypted_secret into v_segredo from vault.decrypted_secrets where name = 'otcb_cron_secret';
+  if v_url is null or v_segredo is null then
+    raise exception 'garimpo_nao_configurado' using errcode = 'P0001';
+  end if;
+  return net.http_post(
+    url := v_url || '/otcb-jogos',
+    body := '{}'::jsonb,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-otcb-cron', v_segredo),
+    timeout_milliseconds := 30000
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_jogos_disparar"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_jogos_gravar"("p_dados" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_gravados integer;
+  v_apagados integer;
+begin
+  insert into public.otcb_jogos (id_externo, competicao, mandante, visitante, inicio)
+  select j ->> 'id_externo', j ->> 'competicao', j ->> 'mandante', j ->> 'visitante', (j ->> 'inicio')::timestamptz
+    from jsonb_array_elements(coalesce(p_dados -> 'jogos', '[]'::jsonb)) j
+  on conflict (id_externo) do update
+     set competicao = excluded.competicao, mandante = excluded.mandante, visitante = excluded.visitante,
+         inicio = excluded.inicio
+   where (public.otcb_jogos.competicao, public.otcb_jogos.mandante, public.otcb_jogos.visitante, public.otcb_jogos.inicio)
+         is distinct from (excluded.competicao, excluded.mandante, excluded.visitante, excluded.inicio);
+  get diagnostics v_gravados = row_count;
+  delete from public.otcb_jogos
+   where id_externo in (select jsonb_array_elements_text(coalesce(p_dados -> 'cancelados', '[]'::jsonb)));
+  get diagnostics v_apagados = row_count;
+  return jsonb_build_object('gravados', v_gravados, 'apagados', v_apagados);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_jogos_gravar"("p_dados" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_limpeza_diaria"() RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -2168,6 +2222,16 @@ GRANT ALL ON FUNCTION "public"."otcb_hoje_sp"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."otcb_inserir_confirmacao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_inserir_confirmacao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_jogos_disparar"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_jogos_disparar"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_jogos_gravar"("p_dados" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_jogos_gravar"("p_dados" "jsonb") TO "service_role";
 
 
 
