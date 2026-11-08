@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Mascot } from '../src/components/Mascot';
@@ -32,7 +32,16 @@ export default function Chat() {
       initialIds.current = null;
       ouvirResultados(addLocalMessage);
       void reload().then(() => enviarFila());
-      return () => ouvirResultados(null);
+      // 12.5: reprocessa a fila a cada minuto enquanto o chat está aberto; e ao voltar ao app (12.4).
+      const timer = setInterval(() => void enviarFila(), 60_000);
+      const sub = AppState.addEventListener('change', (estado) => {
+        if (estado === 'active') void enviarFila();
+      });
+      return () => {
+        ouvirResultados(null);
+        clearInterval(timer);
+        sub.remove();
+      };
     }, [reload, addLocalMessage]),
   );
   useEffect(() => {

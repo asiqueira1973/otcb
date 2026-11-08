@@ -18,3 +18,11 @@ export async function publicarResultado(bloco: ResultadoColarinho): Promise<Chat
   ouvinte?.(m);
   return m;
 }
+
+// Publica um aviso da fila de fotos (12.4/12.5) como fala local do app. Recebe: o texto. Devolve: a mensagem.
+export async function publicarTexto(texto: string): Promise<ChatMessage> {
+  const m: ChatMessage = { id: `aviso-${Date.now()}`, papel: 'assistente', conteudo: texto, blocos: [], criado_em: new Date().toISOString() };
+  await guardarLocal(m);
+  ouvinte?.(m);
+  return m;
+}

@@ -43,7 +43,9 @@ export default function Camera() {
       router.back();
       return;
     }
+    // Sem rede (12.4) ou IA fora (12.5, já conta 1 tentativa): a foto fica guardada e a fila reenvia.
     if (r.falha === 'rede') await enfileirar(uri, coords, confirmou, capturadaEm);
+    if (r.falha === 'ia') await enfileirar(uri, coords, confirmou, capturadaEm, 1);
     setFase({ tipo: 'erro', mensagem: mensagemDaFalha(r.falha) });
   }
 

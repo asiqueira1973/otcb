@@ -161,7 +161,7 @@ export const copy = {
     dontKnow: 'Não sei',
     sending: 'Medindo o colarinho…', // (proposto 8.6)
     permissionTitle: 'Libera a câmera?', // (proposto 8.6)
-    permissionText: 'A câmera é usada só pra fotografar o chopp e dar nota pro colarinho.', // (proposto 8.6)
+    permissionText: 'A câmera é usada só pra fotografar o chopp Brahma e dar nota pro colarinho.', // (proposto 8.6)
     allow: 'Permitir', // (proposto 8.6)
     openSettings: 'Abrir ajustes', // (proposto 8.6)
     title: 'Colarinhômetro', // (proposto 8.6)
@@ -175,6 +175,8 @@ export const copy = {
     share: 'Compartilhar', // passo 6 da 8.6
     photoLimit: 'Por hoje já foram 10 fotos. Amanhã tem mais.', // (proposto 8.6)
     queued: 'Sem sinal: a foto ficou guardada e vai assim que a rede voltar.', // (proposto 8.6)
+    scoreSoon: 'Deu um branco na avaliação. A foto ficou guardada e a nota sai em instantes.', // 12.5 (proposto 8.6)
+    expired: 'Uma foto passou 24 horas na fila sem sinal e foi descartada.', // 12.4 (proposto 8.6)
     tooBig: 'A foto ficou grande demais. Tenta de novo.', // (proposto 8.6)
   },
   // Nomes dos selos da regra 11.11 (proposto 8.4)

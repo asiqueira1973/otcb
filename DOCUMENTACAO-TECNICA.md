@@ -423,7 +423,11 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - A6: o carimbo bate, com tremida, confete âmbar e haptics médio;
   - motivo quando não sai carimbo (15.8 do carimbo); "sem bar" oferece sugerir o bar com "estou no bar";
   - "Compartilhar" captura um `ShareCard` fora da tela, só com bar, nota e comentário (`react-native-view-shot` + `expo-sharing`).
-- **Fila offline:** sem rede, o JPEG é copiado para `Documents/otcb-fila` e entra em `otcb_fila_fotos`. A fila é enviada sempre que o chat ganha foco; o que passa de 24 h é descartado.
+- **Fila offline:**
+  - sem rede (12.4) ou com a IA fora (12.5), o JPEG é copiado para `Documents/otcb-fila` e entra em `otcb_fila_fotos`;
+  - a fila é enviada quando o chat ganha foco, a cada minuto com ele aberto e ao voltar ao app, um processamento por vez;
+  - IA fora: até 3 tentativas com 1 min de intervalo; depois, aviso 15.9;
+  - mais de 24 h: descartada com aviso.
 - **Telemetria:** `otcb_foto_avaliada` e `otcb_carimbo_ganho`, sem foto nem localização.
 
 ### Edge Function `otcb-colarinhometro` (13.5; regras 11.4–11.6)

@@ -3,7 +3,7 @@ import { track } from '../../lib/telemetry';
 import { faixaDaNota } from './nota';
 import { enviarFoto, type EnvioFoto } from './api';
 import { processarFila } from './fila';
-import { publicarResultado } from './resultados';
+import { publicarResultado, publicarTexto } from './resultados';
 
 // Registra a telemetria da foto (seção 21; sem foto nem localização). Recebe: resultado. Devolve: nada.
 export function registrarTelemetria(r: EnvioFoto, teveBarEsperado = false): void {
@@ -28,6 +28,8 @@ export function mensagemDaFalha(falha: Exclude<EnvioFoto, { ok: true }>['falha']
       return copy.colarinho.tooBig;
     case 'rede':
       return copy.colarinho.queued;
+    case 'ia':
+      return copy.colarinho.scoreSoon;
     default:
       return copy.errors.aiDown;
   }
@@ -41,7 +43,9 @@ export async function enviarFila(): Promise<void> {
       (_item, r) => {
         registrarTelemetria(r);
         if (r.ok) void publicarResultado(r.bloco);
+        else if (r.falha !== 'rede') void publicarTexto(mensagemDaFalha(r.falha));
       },
+      (_item, motivo) => void publicarTexto(motivo === 'expirou' ? copy.colarinho.expired : copy.errors.aiDown),
     );
   } catch {
     // tenta de novo na próxima abertura
