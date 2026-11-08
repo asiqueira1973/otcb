@@ -246,6 +246,9 @@ isOneToOne: false
 "otcb_atualizar_coordenadas":
 { Args: { "p_bar_id": string,"p_latitude": number,"p_longitude": number }; Returns: undefined
                            },
+"otcb_avisar_jogos_do_time":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "otcb_bar_mais_proximo":
 { Args: { "p_latitude": number,"p_longitude": number }; Returns: {
               "bar_id": string,"distancia_metros": number
@@ -376,6 +379,9 @@ isOneToOne: false
                            },
 "otcb_sugerir_bar":
 { Args: { "p_bairro": string,"p_endereco": string,"p_latitude": number,"p_longitude": number,"p_nome": string,"p_tem_brahma": boolean }; Returns: Json
+                           },
+"otcb_time_canonico":
+{ Args: { "p_nome": string }; Returns: string
                            },
 "otcb_usuario_atual":
 { Args: Record<PropertyKey, never>; Returns: string

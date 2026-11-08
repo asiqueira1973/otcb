@@ -283,6 +283,52 @@ $$;
 ALTER FUNCTION "public"."otcb_atualizar_coordenadas"("p_bar_id" "uuid", "p_latitude" double precision, "p_longitude" double precision) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_avisar_jogos_do_time"() RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_hoje date := public.otcb_hoje_sp();
+  v_total integer := 0;
+  r record;
+begin
+  for r in
+    select p.id as usuario_id, j.id as jogo_id, j.competicao, j.mandante, j.visitante, j.inicio,
+           case when public.otcb_time_canonico(j.mandante) = public.otcb_time_canonico(p.time_do_coracao)
+                then j.mandante else j.visitante end as time,
+           public.otcb_dia_sp(j.inicio) = v_hoje as e_hoje
+      from public.otcb_perfis p
+      join public.otcb_jogos j
+        on public.otcb_time_canonico(p.time_do_coracao) in (public.otcb_time_canonico(j.mandante), public.otcb_time_canonico(j.visitante))
+     where p.time_do_coracao is not null
+       and j.inicio > now()
+       and public.otcb_dia_sp(j.inicio) in (v_hoje, v_hoje + 1)
+       and not exists (
+         select 1 from public.otcb_mensagens m
+          where m.usuario_id = p.id and m.papel = 'assistente'
+            and m.blocos @> jsonb_build_array(jsonb_build_object('tipo', 'jogos',
+                  'jogos', jsonb_build_array(jsonb_build_object('jogo_id', j.id::text)))))
+     order by j.inicio
+  loop
+    insert into public.otcb_mensagens (usuario_id, papel, conteudo, blocos)
+    values (r.usuario_id, 'assistente',
+            (case when r.e_hoje then 'Hoje tem ' else 'Amanhã tem ' end) || r.time || '! '
+              || r.mandante || ' × ' || r.visitante || ', ' || r.competicao || ', às '
+              || to_char(r.inicio at time zone 'America/Sao_Paulo', 'HH24"h"MI') || '. '
+              || 'Quer que eu ache um bar com chopp Brahma que passe o jogo?',
+            jsonb_build_array(jsonb_build_object('tipo', 'jogos', 'jogos', jsonb_build_array(jsonb_build_object(
+              'jogo_id', r.jogo_id::text, 'competicao', r.competicao, 'mandante', r.mandante,
+              'visitante', r.visitante, 'inicio', r.inicio)))));
+    v_total := v_total + 1;
+  end loop;
+  return v_total;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_avisar_jogos_do_time"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double precision, "p_longitude" double precision) RETURNS TABLE("bar_id" "uuid", "distancia_metros" integer)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1451,6 +1497,45 @@ $$;
 ALTER FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_time_canonico"("p_nome" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $_$
+  with n as (
+    select trim(regexp_replace(regexp_replace(
+             translate(lower(coalesce(p_nome, '')), 'áàãâäéèêëíìîïóòõôöúùûüç-', 'aaaaaeeeeiiiiooooouuuuc '),
+             '\s+(fc|ec|sc)$', ''), '\s+', ' ', 'g')) as v
+  )
+  select case
+    when v = '' then null
+    when v in ('vasco', 'vascao', 'gigante da colina') then 'vasco da gama'
+    when v in ('timao', 'coringao', 'corinthians paulista') then 'corinthians'
+    when v in ('verdao', 'porco', 'palestra') then 'palmeiras'
+    when v in ('spfc', 'tricolor paulista', 'soberano', 'sao paulo futebol clube') then 'sao paulo'
+    when v = 'peixe' then 'santos'
+    when v in ('mengao', 'mengo', 'fla') then 'flamengo'
+    when v in ('flu', 'fluzao', 'tricolor carioca') then 'fluminense'
+    when v in ('fogao', 'glorioso') then 'botafogo'
+    when v in ('galo', 'atletico mineiro', 'atletico mg') then 'atletico mg'
+    when v = 'raposa' then 'cruzeiro'
+    when v in ('colorado', 'inter') then 'internacional'
+    when v in ('tricolor gaucho', 'imortal') then 'gremio'
+    when v in ('furacao', 'athletico', 'athletico paranaense', 'athletico pr') then 'atletico paranaense'
+    when v in ('bragantino', 'red bull bragantino', 'massa bruta') then 'rb bragantino'
+    when v = 'esquadrao' then 'bahia'
+    when v = 'sport' then 'sport recife'
+    when v = 'coxa' then 'coritiba'
+    when v = 'chape' then 'chapecoense'
+    when v = 'ponte' then 'ponte preta'
+    when v = 'guarani' then 'guarani campinas'
+    else v end
+  from n;
+$_$;
+
+
+ALTER FUNCTION "public"."otcb_time_canonico"("p_nome" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_usuario_atual"() RETURNS "uuid"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -2095,6 +2180,11 @@ GRANT ALL ON FUNCTION "public"."otcb_atualizar_coordenadas"("p_bar_id" "uuid", "
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_avisar_jogos_do_time"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_avisar_jogos_do_time"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double precision, "p_longitude" double precision) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double precision, "p_longitude" double precision) TO "service_role";
 
@@ -2331,6 +2421,11 @@ GRANT ALL ON FUNCTION "public"."otcb_salvar_opiniao"("p_usuario" "uuid", "p_bar_
 REVOKE ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_time_canonico"("p_nome" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_time_canonico"("p_nome" "text") TO "service_role";
 
 
 

@@ -548,6 +548,12 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Agente:** `COBERTURA_JOGOS` e `TEXTOS.coberturaJogos` com o novo alcance; prompt v10.
 - **Checagem real (08/11/2026):** a carga gravou 44 jogos de hoje e amanhã (Copa do Brasil, Série B, Pernambucano, ligas europeias) e "o vasco joga hoje?" respondeu "Joga sim! Vasco x Palmeiras, pela Copa do Brasil, hoje às 17h" com o card de jogos. Os jogos antigos do football-data (sem prefixo `af:`) foram apagados na troca.
 
+### Aviso do jogo do time do coração (emenda do 8.11)
+- **O que faz:** às 05:45 de São Paulo (`otcb_cron_avisos_jogos`, 15 minutos depois da carga de jogos), `otcb_avisar_jogos_do_time()` grava uma mensagem do assistente no chat de quem tem jogo do time do coração **hoje ou amanhã** e que ainda não começou: "Hoje tem Vasco da Gama! Vasco da Gama × Palmeiras, Copa do Brasil, às 17h00. Quer que eu ache um bar com chopp Brahma que passe o jogo?", com o card `jogos`. O app mostra ao abrir o chat (o histórico é relido no foco), sem mudança no app.
+- **Sem repetição:** não grava de novo se já existe mensagem do assistente com aquele `jogo_id` no card. Se a pessoa limpar a conversa, o aviso pode voltar na rotina seguinte.
+- **Time do perfil é texto livre:** `otcb_time_canonico` tira acento, hífen e sufixo fc/ec/sc e troca apelidos comuns pelo nome da API (Timão → Corinthians, Verdão → Palmeiras, Galo → Atletico-MG, Mengão → Flamengo…). A comparação é exata depois disso, então "Botafogo" não casa com "Botafogo SP".
+- **Funções só do serviço;** pgTAP `150_avisos_jogo` (12 casos). Primeira execução no remoto (08/11/2026): 0 avisos, porque o jogo do Vasco do dia já tinha começado.
+
 ### Agente: onde ver o jogo (8.9)
 - **`jogos_de_hoje`:** com time, devolve `jogos_do_time` e `outros_jogos`. Com time, a busca lê a janela inteira antes de filtrar (o limite de 50 escondia o jogo do time).
 - **Jogos desatualizados (12.5):** a última execução da `otcb-jogos` falhou, passou de 36 h ou não existe. Então `jogos_de_hoje` traz `atualizacao_falhou` e a resposta sempre diz "Não consegui atualizar os jogos hoje…": o prompt v7 pede isso e, se o modelo esquecer, o servidor acrescenta a frase.
