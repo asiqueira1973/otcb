@@ -16,5 +16,7 @@ export const TEXTOS = {
   perguntaJogos: (bar: string) => `O ${bar} passa jogo?`,
   perguntaFuncionamento: (bar: string) => `O ${bar} fechou?`,
   // (proposto 8.9) regra 12.5: football-data fora; os jogos mostrados são os da última atualização.
+  // (proposto 8.11) a base de jogos só cobre parte das competições (premissa P2, assunção 24.9).
+  coberturaJogos: "Aqui eu só acompanho o Brasileirão Série A e as ligas europeias; Copa do Brasil e estaduais ainda não aparecem.",
   jogosDesatualizados: "Não consegui atualizar os jogos hoje, então essa lista pode estar desatualizada.",
 } as const;

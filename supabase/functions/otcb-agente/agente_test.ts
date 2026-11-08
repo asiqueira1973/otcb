@@ -534,7 +534,9 @@ Deno.test("verifier 8.9 (12.5): jogos em dia → nada de aviso", async () => {
   const corpo = await (await handleAgente(req({ mensagem: "jogo do Corinthians hoje" }), deps(db, modelo))).json();
   const resultado = JSON.parse((chamadas[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].content as string);
   assertFalse("atualizacao_falhou" in resultado);
-  assertEquals(corpo.texto, "Hoje não tem jogo do Corinthians.");
+  // A intenção do teste é não haver o aviso da 12.5. Desde o bug do 8.11 o aviso de cobertura pode vir junto.
+  assertFalse(/não consegui atualizar/i.test(corpo.texto), corpo.texto);
+  assert(corpo.texto.startsWith("Hoje não tem jogo do Corinthians."), corpo.texto);
 });
 
 Deno.test("verifier 8.9 (menor): só cards com jogos desatualizados → texto padrão e o aviso", async () => {

@@ -71,6 +71,19 @@ export function contextoDoTurno(entrada: EntradaAgente): string {
   return linhas.join("\n");
 }
 
+// Reescreve "Hoje o Vasco não joga" e variações para "não achei jogo do Vasco hoje nas competições que eu
+// acompanho" e acrescenta TEXTOS.coberturaJogos se a resposta ainda não fala da Copa do Brasil.
+// Recebe: texto da resposta. Devolve: texto ajustado.
+export function semAfirmarQueNaoJoga(texto: string): string {
+  const troca = (_m: string, art: string, nome: string) => `não achei jogo d${art.toLowerCase()} ${nome.trim()} hoje nas competições que eu acompanho`;
+  let t = texto
+    .replace(/\bhoje,?\s+(o|a)\s+([^.,!?\n]+?)\s+não\s+(?:joga|tem\s+jogo|entra\s+em\s+campo)\b/gi, troca)
+    .replace(/\b(o|a)\s+([^.,!?\n]+?)\s+não\s+(?:joga|tem\s+jogo|entra\s+em\s+campo)\s+hoje\b/gi, troca);
+  t = t.replace(/(^|[.!?]\s+)não achei jogo/g, (_m, antes: string) => `${antes}Não achei jogo`);
+  if (!/Copa do Brasil/i.test(t)) t = `${t}\n\n${TEXTOS.coberturaJogos}`;
+  return t;
+}
+
 // Executa o turno. Recebe: entrada, banco (para as ferramentas) e modelo. Devolve: texto e blocos.
 // Lança IaIndisponivel se o modelo falhar ou não produzir texto nem blocos.
 export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: ModeloAgente): Promise<{ texto: string; blocos: Bloco[]; uso: UsoTurno }> {
@@ -132,6 +145,9 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
 
   // Sem texto final: com cards, o handler usa o texto padrão; sem nada, o último rascunho é melhor que vazio.
   let texto = (textos.join("\n\n") || (turno.blocos.length === 0 ? rascunhos.at(-1) ?? "" : "")).trim();
+  // Bug do 8.11: sem jogo do time hoje na base, a resposta não pode afirmar que ele não joga (pode jogar em
+  // competição que a base não cobre). O servidor reescreve a afirmação e garante o aviso de cobertura.
+  if (turno.timeSemJogoHoje && texto) texto = semAfirmarQueNaoJoga(texto);
   // Regra 12.5: com os jogos desatualizados, a resposta sempre avisa (o servidor garante se o modelo esquecer).
   if (turno.jogosDesatualizados && !/n[ãa]o consegui atualizar/i.test(texto)) {
     texto = `${texto || TEXTOS.soCards}\n\n${TEXTOS.jogosDesatualizados}`;

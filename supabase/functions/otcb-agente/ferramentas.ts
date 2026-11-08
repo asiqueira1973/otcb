@@ -137,11 +137,17 @@ export async function montarCardEntrada(p: Record<string, unknown>, db: AgenteDb
 }
 
 // jogosDesatualizados (regra 12.5): a última atualização dos jogos falhou; o agente avisa na resposta.
-export type Turno = { cache: CacheTurno; blocos: Bloco[]; local: { latitude: number; longitude: number } | null; jogosDesatualizados?: boolean };
+// timeSemJogoHoje (bug do 8.11): o time pedido não tem jogo hoje na base, o que não quer dizer que ele não joga.
+export type Turno = { cache: CacheTurno; blocos: Bloco[]; local: { latitude: number; longitude: number } | null; jogosDesatualizados?: boolean; timeSemJogoHoje?: string };
 
 // Competições que a otcb-jogos traz (plano grátis do football-data.org, premissa P2 e assunção 24.9).
 export const COBERTURA_JOGOS =
   "Brasileirão Série A e as principais ligas europeias e a Champions League. Não inclui Copa do Brasil, Libertadores, Série B nem estaduais.";
+
+// Dia em São Paulo (AAAA-MM-DD) de um instante ISO. Recebe: instante. Devolve: data.
+function diaSp(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
 
 // Horário de um jogo em São Paulo, no formato "sáb 14/11 20:30". Recebe: instante ISO (UTC). Devolve: texto.
 export function horarioSp(iso: string): string {
@@ -204,6 +210,11 @@ export async function executarFerramenta(nome: string, entrada: Record<string, u
         // 8.9: diz ao modelo quais jogos são do time pedido (os demais vêm só como contexto).
         const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const doTime = time ? jogos.filter((j) => norm(`${j.mandante} ${j.visitante}`).includes(norm(time))) : [];
+        if (time) {
+          const hojeSp = diaSp(new Date().toISOString());
+          if (doTime.some((j) => diaSp(j.inicio) === hojeSp)) turno.timeSemJogoHoje = undefined;
+          else turno.timeSemJogoHoje = time;
+        }
         return JSON.stringify(time
           ? { time_pedido: time, jogos_do_time: doTime.map(paraModelo), outros_jogos: jogos.filter((j) => !doTime.includes(j)).slice(0, 10).map(paraModelo), ...aviso }
           : { jogos: jogos.map(paraModelo), ...aviso });
