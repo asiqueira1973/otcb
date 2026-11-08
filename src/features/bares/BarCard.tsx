@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 2, borderRadius: 14, padding: 14, paddingTop: 18, gap: 6, minHeight: 44 },
   compact: { paddingVertical: 12 },
   perforation: { position: 'absolute', top: 8, left: 14, right: 14, borderTopWidth: 2, borderStyle: 'dashed' },
-  name: { fontFamily: fonts.title, fontSize: 20, lineHeight: 24 },
+  name: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 24, lineHeight: 26 },
   meta: { fontFamily: fonts.body, fontSize: 14 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   collar: { fontFamily: fonts.body, fontSize: 14 },

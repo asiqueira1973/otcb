@@ -36,8 +36,8 @@ export default function Welcome() {
 
 const styles = StyleSheet.create({
   hero: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16, minHeight: 280 },
-  brand: { fontFamily: fonts.title, fontSize: 40, letterSpacing: 2 },
-  title: { fontFamily: fonts.title, fontSize: 34, lineHeight: 40 },
+  brand: { fontFamily: fonts.title, fontSize: 48, letterSpacing: 2 },
+  title: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 41, lineHeight: 44 },
   subtitle: { fontFamily: fonts.body, fontSize: 18, lineHeight: 26 },
   footer: { fontFamily: fonts.body, fontSize: 14, textAlign: 'center' },
 });

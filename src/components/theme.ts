@@ -73,9 +73,10 @@ export function useTheme(): Theme {
   return useColorScheme() === 'dark' ? dark : light;
 }
 
-// Famílias tipográficas (16.3): Baloo 2 nos títulos, Nunito (peso mínimo 500) no texto.
+// Famílias tipográficas (16.3, com a emenda do 8.4): Bebas Neue nos títulos (letreiro condensado, só
+// maiúsculas; tamanhos ~20% maiores que os da Baloo 2) e Nunito (peso mínimo 500) no texto.
 export const fonts = {
-  title: 'Baloo2_800ExtraBold',
+  title: 'BebasNeue_400Regular',
   body: 'Nunito_600SemiBold',
   bodyBold: 'Nunito_800ExtraBold',
 } as const;

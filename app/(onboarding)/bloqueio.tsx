@@ -20,5 +20,5 @@ export default function Blocked() {
 }
 
 const styles = StyleSheet.create({
-  text: { fontFamily: fonts.title, fontSize: 26, lineHeight: 32, textAlign: 'center' },
+  text: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 31, lineHeight: 33, textAlign: 'center' },
 });

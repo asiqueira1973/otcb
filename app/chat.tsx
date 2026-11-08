@@ -134,7 +134,7 @@ export default function Chat() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 6 },
-  brand: { fontFamily: fonts.title, fontSize: 26 },
+  brand: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 31 },
   shortcuts: { flexDirection: 'row', gap: 4 },
   shortcut: { minHeight: 44, minWidth: 44, paddingHorizontal: 10, justifyContent: 'center' },
   shortcutText: { fontFamily: fonts.bodyBold, fontSize: 15 },

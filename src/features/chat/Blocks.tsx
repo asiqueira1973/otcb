@@ -102,7 +102,7 @@ export function Blocks({ blocos }: Props) {
 const styles = StyleSheet.create({
   stack: { gap: 10 },
   box: { borderWidth: 2, borderRadius: 14, padding: 14, gap: 6 },
-  title: { fontFamily: fonts.title, fontSize: 18, lineHeight: 22 },
+  title: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 22, lineHeight: 24 },
   body: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21 },
   actions: { gap: 8 },
   action: {},

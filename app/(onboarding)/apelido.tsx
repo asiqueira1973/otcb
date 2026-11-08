@@ -84,5 +84,5 @@ export default function Nickname() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontFamily: fonts.title, fontSize: 32, lineHeight: 38 },
+  title: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 38, lineHeight: 41 },
 });

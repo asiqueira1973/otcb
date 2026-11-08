@@ -50,7 +50,7 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontFamily: fonts.title, fontSize: 30, textAlign: 'center' },
+  title: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 36, textAlign: 'center' },
   body: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22, textAlign: 'center' },
   footer: { fontFamily: fonts.body, fontSize: 14, textAlign: 'center' },
 });
