@@ -139,6 +139,10 @@ export async function montarCardEntrada(p: Record<string, unknown>, db: AgenteDb
 // jogosDesatualizados (regra 12.5): a última atualização dos jogos falhou; o agente avisa na resposta.
 export type Turno = { cache: CacheTurno; blocos: Bloco[]; local: { latitude: number; longitude: number } | null; jogosDesatualizados?: boolean };
 
+// Competições que a otcb-jogos traz (plano grátis do football-data.org, premissa P2 e assunção 24.9).
+export const COBERTURA_JOGOS =
+  "Brasileirão Série A e as principais ligas europeias e a Champions League. Não inclui Copa do Brasil, Libertadores, Série B nem estaduais.";
+
 // Horário de um jogo em São Paulo, no formato "sáb 14/11 20:30". Recebe: instante ISO (UTC). Devolve: texto.
 export function horarioSp(iso: string): string {
   const d = new Date(iso);
@@ -191,7 +195,9 @@ export async function executarFerramenta(nome: string, entrada: Record<string, u
         const [jogos, emDia] = await Promise.all([db.jogos(time, dias), db.jogosAtualizados().catch(() => true)]);
         for (const j of jogos) turno.cache.jogos.set(j.jogo_id, j);
         if (!emDia) turno.jogosDesatualizados = true;
-        const aviso = emDia ? {} : { atualizacao_falhou: true };
+        // Bug do 8.11: a base só tem o que o plano grátis do football-data cobre; o modelo não pode afirmar que o
+        // time não joga, só que não achou jogo nessas competições.
+        const aviso = { cobertura: COBERTURA_JOGOS, ...(emDia ? {} : { atualizacao_falhou: true }) };
         // Bug do 8.11: o modelo recebe o horário já em São Paulo (inicio_sp), para não fazer conta de fuso em voz
         // alta; o card "jogos" continua usando o inicio UTC do cache.
         const paraModelo = (j: Jogo) => ({ jogo_id: j.jogo_id, competicao: j.competicao, mandante: j.mandante, visitante: j.visitante, inicio_sp: horarioSp(j.inicio) });
