@@ -406,3 +406,14 @@ Deno.test("8.5: o agente não tem ferramenta que grava", () => {
   const nomes = FERRAMENTAS.map((f) => f.name);
   assertEquals(nomes.sort(), ["buscar_bares", "detalhes_bar", "jogos_de_hoje", "meu_passaporte", "mostrar", "oferecer_card", "opinioes_do_bar"]);
 });
+
+Deno.test("problema 6 do verifier: pergunta de funcionamento é 'fechou?', coerente com o único botão 'Fechou'", async () => {
+  const { db } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  const { modelo } = fakeModelo([
+    usoFerramenta("t1", "detalhes_bar", { bar_id: "b1" }),
+    usoFerramenta("t2", "oferecer_card", { tipo: "pergunta_confirmacao", bar_id: "b1", assunto: "funcionamento" }),
+    textoFinal("Me conta."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "o Bar b1 fechou" }), deps(db, modelo))).json();
+  assertEquals(corpo.blocos[0].pergunta, "O Bar b1 fechou?");
+});

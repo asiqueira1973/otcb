@@ -3,7 +3,7 @@ import { assertEquals, assertFalse } from "jsr:@std/assert@1";
 
 import { verificarTermos } from "./bloqueio.ts";
 import { handleOpinioes, type OpinioesDb, validarOpiniao } from "./handler.ts";
-import { ModeracaoIndisponivel, type Moderador, validarVeredito } from "./moderacao.ts";
+import { criarModerador, ModeracaoIndisponivel, type Moderador, validarVeredito } from "./moderacao.ts";
 
 const BAR = "00000000-0000-0000-0000-000000000b01";
 
@@ -109,4 +109,15 @@ Deno.test("contrato do veredito", () => {
   assertEquals(validarVeredito({ permitida: true, motivo: "nenhum" }), { permitida: true, motivo: "nenhum" });
   assertEquals(validarVeredito({ permitida: "sim", motivo: "nenhum" }), null);
   assertEquals(validarVeredito({ permitida: false, motivo: "outro" }), null);
+});
+
+Deno.test("problema 4 do verifier (12.5): saída fora do contrato ganha 1 nova tentativa antes do 503", async () => {
+  const respostas = ['{"permitida":"talvez"}', '{"permitida":true,"motivo":"nenhum"}'];
+  let chamadas = 0;
+  const m = criarModerador("x", () => {
+    const t = respostas[chamadas++];
+    return Promise.resolve({ stop_reason: "end_turn", content: [{ type: "text", text: t }] } as never);
+  });
+  assertEquals(await m.moderar("Chopp muito bom"), { permitida: true, motivo: "nenhum" });
+  assertEquals(chamadas, 2);
 });
