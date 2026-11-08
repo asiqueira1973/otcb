@@ -341,3 +341,14 @@ Deno.test("critério 8: com o sub confirmado, o turno usa as consultas adiantada
   assertEquals(consultas, 1);
   assertEquals(estado.gravadas.length, 2);
 });
+
+Deno.test("P1: 'você sabe se o bar vende chopp Brahma?' não é compra; 'você(s) vende(m)/entrega(m)' é", () => {
+  for (const ok of [
+    "você sabe se o Bar do Nico vende chopp Brahma?",
+    "vc sabe qual bar perto vende chopp Brahma?",
+    "voce sabe se o bar do juarez ainda vende brahma?",
+  ]) assertEquals(verificarGuardrail(ok), null, ok);
+  for (const compra of ["vocês vendem chopp?", "vc vende barril?", "voces entregam?", "o app entrega chopp em casa?"]) {
+    assertEquals(verificarGuardrail(compra)?.tipo, "compra", compra);
+  }
+});
