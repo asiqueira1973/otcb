@@ -149,3 +149,13 @@ Deno.test("bug real do 8.6: comentário longo é cortado no fim de palavra, com 
   assertEquals(validarAvaliacao({ ...CHOPP, comentario: "Curto e bom." })!.comentario, "Curto e bom.");
   assert(longo.charAt(v.comentario.length - 1) === " " || /[.,!]/.test(v.comentario.at(-2)!), "termina numa palavra inteira");
 });
+
+Deno.test("bug real do 8.8 (mesma causa): a visão reserva tokens para o raciocínio do modelo", async () => {
+  const pedidos: { max_tokens: number }[] = [];
+  const v = criarVisao("k", (p) => {
+    pedidos.push(p as never);
+    return Promise.resolve({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(CHOPP) }] } as never);
+  });
+  await v.avaliar("AAAA");
+  assert(pedidos[0].max_tokens >= 2048, `max_tokens ${pedidos[0].max_tokens}`);
+});

@@ -121,3 +121,13 @@ Deno.test("problema 4 do verifier (12.5): saída fora do contrato ganha 1 nova t
   assertEquals(await m.moderar("Chopp muito bom"), { permitida: true, motivo: "nenhum" });
   assertEquals(chamadas, 2);
 });
+
+Deno.test("bug real do 8.8: a moderação reserva tokens para o raciocínio do modelo (texto de ódio parava em max_tokens)", async () => {
+  const pedidos: { max_tokens: number }[] = [];
+  const m = criarModerador("x", (p) => {
+    pedidos.push(p as never);
+    return Promise.resolve({ stop_reason: "end_turn", content: [{ type: "text", text: '{"permitida":false,"motivo":"odio"}' }] } as never);
+  });
+  assertEquals(await m.moderar("texto"), { permitida: false, motivo: "odio" });
+  if (pedidos[0].max_tokens < 2048) throw new Error(`max_tokens ${pedidos[0].max_tokens} não deixa espaço para o raciocínio`);
+});

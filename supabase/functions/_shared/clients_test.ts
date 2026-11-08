@@ -102,3 +102,19 @@ Deno.test("11.8: resumo não recebe apelidos e é cortado em 400 caracteres", as
   if (!/Não cite nomes nem apelidos/.test(enviado)) throw new Error("o prompt precisa proibir apelidos");
   if (resumo.length !== 400) throw new Error(`resumo com ${resumo.length} caracteres`);
 });
+
+Deno.test("bug real do 8.8: resumo longo é cortado no fim de uma frase ou palavra, com reticências, e o pedido reserva tokens para o raciocínio", async () => {
+  const { createClaudeClient } = await import("./claude.ts");
+  const longo = "O ambiente foi elogiado. ".repeat(10) + "A temperatura e o colarinho do chopp foram os pontos mais citados nas avaliações.";
+  const pedidos: { max_tokens: number }[] = [];
+  const claude = createClaudeClient("k", (p) => {
+    pedidos.push(p as never);
+    return Promise.resolve({ stop_reason: "end_turn", content: [{ type: "text", text: longo }] } as never);
+  });
+  const resumo = await claude.summarize([{ texto: "a", nota: null }], () => {});
+  if (resumo.length > 400) throw new Error("passou de 400");
+  if (!resumo.endsWith("…") && !resumo.endsWith(".")) throw new Error(`terminou no meio: ${resumo.slice(-20)}`);
+  if (!longo.startsWith(resumo.replace(/…$/, "").trimEnd())) throw new Error("não é prefixo");
+  if (/\s\S{1,3}…$/.test(resumo) && !longo.includes(resumo.replace(/…$/, "") + " ")) throw new Error("cortou palavra");
+  if (pedidos[0].max_tokens < 2048) throw new Error(`max_tokens ${pedidos[0].max_tokens}`);
+});
