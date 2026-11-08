@@ -417,3 +417,51 @@ Deno.test("problema 6 do verifier: pergunta de funcionamento é 'fechou?', coere
   const corpo = await (await handleAgente(req({ mensagem: "o Bar b1 fechou" }), deps(db, modelo))).json();
   assertEquals(corpo.blocos[0].pergunta, "O Bar b1 fechou?");
 });
+
+// ===================================================================== onde ver o jogo (8.9)
+
+Deno.test("8.9: jogos_de_hoje separa os jogos do time pedido; o card jogos traz só o escolhido", async () => {
+  const { db } = fakeDb();
+  db.jogos = () => Promise.resolve([
+    { jogo_id: "j1", competicao: "Brasileirão", mandante: "Corinthians", visitante: "Palmeiras", inicio: "2026-11-08T22:00:00Z" },
+    { jogo_id: "j2", competicao: "Premier League", mandante: "Chelsea", visitante: "Arsenal", inicio: "2026-11-08T17:00:00Z" },
+  ]);
+  const { modelo, chamadas } = fakeModelo([
+    usoFerramenta("t1", "jogos_de_hoje", { time: "corinthians" }),
+    { stop_reason: "tool_use", content: [
+      { type: "text", text: "Tem Corinthians hoje.", citations: null } as Anthropic.TextBlock,
+      { type: "tool_use", id: "t2", name: "mostrar", input: { blocos: [{ tipo: "jogos", jogo_ids: ["j1"] }] } } as Anthropic.ToolUseBlock,
+    ] },
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "onde ver o jogo do Corinthians hoje" }), deps(db, modelo))).json();
+  const resultado = JSON.parse((chamadas[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].content as string);
+  assertEquals(resultado.jogos_do_time.map((j: { jogo_id: string }) => j.jogo_id), ["j1"]);
+  assertEquals(resultado.outros_jogos.map((j: { jogo_id: string }) => j.jogo_id), ["j2"]);
+  assertEquals(corpo.blocos[0].jogos.map((j: { jogo_id: string }) => j.jogo_id), ["j1"]);
+});
+
+Deno.test("8.9 (critério 3): sem bar que passe jogo, a pergunta de transmissão é do servidor", async () => {
+  const { db } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  const { modelo } = fakeModelo([
+    usoFerramenta("t1", "buscar_bares", { bairro: "Pinheiros" }),
+    { stop_reason: "tool_use", content: [
+      { type: "text", text: "Nenhum bar confirmou que passa jogo aqui.", citations: null } as Anthropic.TextBlock,
+      { type: "tool_use", id: "t2", name: "oferecer_card", input: { tipo: "pergunta_confirmacao", bar_id: "b1", assunto: "transmite_jogos" } } as Anthropic.ToolUseBlock,
+    ] },
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "onde ver o jogo em Pinheiros" }), deps(db, modelo))).json();
+  assertEquals(corpo.blocos[0], { tipo: "pergunta_confirmacao", bar_id: "b1", nome_bar: "Bar b1", assunto: "transmite_jogos", pergunta: "O Bar b1 passa jogo?" });
+});
+
+Deno.test("bug real do 8.9: texto de rodadas intermediárias (rascunho) não vai para a resposta", async () => {
+  const { db } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  const { modelo } = fakeModelo([
+    { stop_reason: "tool_use", content: [
+      { type: "text", text: "Horário UTC 23:30 = 20:30 em São Paulo.", citations: null } as Anthropic.TextBlock,
+      { type: "tool_use", id: "t1", name: "buscar_bares", input: { bairro: "Pinheiros" } } as Anthropic.ToolUseBlock,
+    ] },
+    textoFinal("Hoje tem jogo às 20h30 e o Bar b1 passa."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "jogo hoje?" }), deps(db, modelo))).json();
+  assertEquals(corpo.texto, "Hoje tem jogo às 20h30 e o Bar b1 passa.");
+});
