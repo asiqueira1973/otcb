@@ -86,6 +86,8 @@ export function Blocks({ blocos, messageId = "local", animar = false }: Props) {
                 key={i}
                 testID="bloco-passaporte"
                 accessibilityRole="button"
+                accessibilityLabel={`${copy.blocks.passport}: ${copy.blocks.stamps(b.total_carimbos)}`}
+                accessibilityHint={copy.passport.title}
                 onPress={() => router.push('/passaporte')}
                 style={[styles.box, { backgroundColor: theme.card, borderColor: theme.border }]}
               >

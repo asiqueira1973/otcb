@@ -57,7 +57,7 @@ it('critério 1: mostra os números do otcb_meu_passaporte', async () => {
   await waitFor(() => expect(screen.getByText('3 bares carimbados')).toBeTruthy());
   expect(screen.getByLabelText('Pinheiros: 1 de 6 bares')).toBeTruthy();
   expect(screen.getByLabelText('Moema: 1 de 1 bares')).toBeTruthy();
-  expect(screen.queryByTestId('bairro-Itaim Bibi')).toBeNull(); // sem carimbo ainda
+  expect(screen.getByLabelText('Itaim Bibi: 0 de 5 bares')).toBeTruthy(); // 11.11: bairro sem carimbo também aparece (correção do verifier)
   expect(screen.getByLabelText(`Andarilho, ${copy.passport.progress(3, 5)}`)).toBeTruthy();
   expect(screen.getByLabelText(`Primeira tirada, ${copy.passport.conquered}`)).toBeTruthy();
 });

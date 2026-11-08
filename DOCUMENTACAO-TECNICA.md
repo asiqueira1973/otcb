@@ -461,11 +461,12 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **O que aparece:**
   - "N bares carimbados";
   - grade de carimbos de borracha (16.4), em que tocar abre a Ficha; os cards da Ficha voltam para o chat como mensagens locais;
-  - coleções dos bairros onde já há carimbo, com conquistados primeiro;
+  - coleções de todos os bairros com bares ativos, com conquistados e com progresso primeiro;
   - coleção Clássicos, só quando `total > 0` (25.5 adiada pelo Alexandre: sem clássicos por enquanto);
   - os 5 selos, com progresso e nível do Explorador.
 - **Princípio 3:** nenhum texto conta chopp ou fotos; o "Olho clínico" fala em "bares".
-- **A7:** detecta o selo novo comparando com `otcb_selos_vistos` no aparelho. Na primeira abertura só memoriza; depois anima e dispara `otcb_selo_ganho`.
+- **A7:** detecta o selo novo comparando com `otcb_selos_vistos` no aparelho. Na primeira abertura, todos os conquistados contam como novos. Cada novo anima e dispara `otcb_selo_ganho`.
+- **Sem rede e sem cache:** 15.9 com "Tentar de novo". Todos os bairros com bares ativos aparecem, os com carimbo primeiro.
 - **A11:** a Bolacha gira enquanto carrega e ao puxar para atualizar.
 - **Vazio:** a 15.5, com um botão para o Colarinhômetro.
 - **Checagem real (08/11/2026):**

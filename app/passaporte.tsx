@@ -33,6 +33,8 @@ export default function PassaporteScreen() {
   );
 }
 
+// Conteúdo do Passaporte (precisa ficar dentro do BarSheetProvider para abrir a Ficha pelo carimbo). Carrega
+// os dados, detecta selo novo e mostra vazio, erro sem rede (15.9) ou a coleção. Recebe: nada.
 function Conteudo() {
   const theme = useTheme();
   const { openBar } = useBarSheet();
@@ -40,10 +42,12 @@ function Conteudo() {
   const [doCache, setDoCache] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [novos, setNovos] = useState<string[]>([]);
+  const [falhou, setFalhou] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
     const r = await carregarPassaporte();
+    setFalhou(!r);
     if (r) {
       setDados(r.dados);
       setDoCache(r.doCache);
@@ -56,8 +60,8 @@ function Conteudo() {
     void carregar(); // eslint-disable-line react-hooks/set-state-in-effect -- carga inicial da tela
   }, [carregar]);
 
+  // 11.11: todos os bairros com bares ativos; conquistados e com progresso primeiro.
   const bairros = [...(dados?.colecoes_bairro ?? [])]
-    .filter((c) => c.carimbos > 0)
     .sort((a, b) => Number(b.conquistado) - Number(a.conquistado) || b.carimbos / b.total_bares - a.carimbos / a.total_bares);
   const vazio = !!dados && dados.carimbos.length === 0;
 
@@ -74,6 +78,13 @@ function Conteudo() {
       >
         {carregando && dados ? <Girando /> : null}
         {doCache ? <Text style={[styles.aviso, { color: theme.textMuted }]}>{copy.passport.offline}</Text> : null}
+        {falhou && !dados && !carregando ? (
+          <View style={styles.vazio} testID="passaporte-erro">
+            <Mascot mood="triste" size={120} />
+            <Text style={[styles.corpo, { color: theme.text }]}>{copy.errors.noNetwork}</Text>
+            <Button testID="passaporte-tentar" label={copy.errors.retry} onPress={() => void carregar()} />
+          </View>
+        ) : null}
         {vazio ? (
           <View style={styles.vazio} testID="passaporte-vazio">
             <Mascot mood="gentil" size={140} />

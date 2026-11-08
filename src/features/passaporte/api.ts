@@ -42,8 +42,9 @@ function chaveDoSelo(s: Selo): string {
   return s.nivel ? `${s.selo}:${s.nivel}` : s.selo;
 }
 
-// Selos conquistados desde a última vez que a pessoa abriu o Passaporte neste aparelho (A7). Na primeira vez,
-// só memoriza (não anima o que já existia). Registra otcb_selo_ganho para cada novo (seção 21).
+// Selos conquistados desde a última vez que a pessoa abriu o Passaporte neste aparelho (A7). Na primeira
+// abertura, todos os conquistados são novidade (a identidade é anônima por aparelho, seção 6; o selo do 1º
+// carimbo costuma chegar antes de abrir a tela). Registra otcb_selo_ganho para cada novo (seção 21).
 // Recebe: selos atuais. Devolve: os nomes (selo) dos novos.
 export async function selosNovos(selos: Selo[]): Promise<string[]> {
   const agora = selos.filter((s) => s.conquistado).map(chaveDoSelo);
@@ -55,8 +56,8 @@ export async function selosNovos(selos: Selo[]): Promise<string[]> {
     vistos = null;
   }
   await AsyncStorage.setItem(VISTOS, JSON.stringify(agora)).catch(() => undefined);
-  if (vistos === null) return [];
-  const novos = agora.filter((k) => !vistos!.includes(k)).map((k) => k.split(':')[0]);
+  const jaVistos = vistos ?? [];
+  const novos = agora.filter((k) => !jaVistos.includes(k)).map((k) => k.split(':')[0]);
   for (const selo of novos) track('otcb_selo_ganho', { selo });
   return novos;
 }
