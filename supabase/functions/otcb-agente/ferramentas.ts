@@ -2,7 +2,7 @@ import type Anthropic from "npm:@anthropic-ai/sdk@^0";
 
 import { CacheTurno, montarBlocos, paraCardBar } from "./blocos.ts";
 import { TEXTOS } from "./textos.ts";
-import type { AgenteDb, Bloco, CardBar } from "./tipos.ts";
+import type { AgenteDb, Jogo, Bloco, CardBar } from "./tipos.ts";
 
 // Ferramentas do agente (seção 13.3). Nenhuma grava dado do usuário (o agente não escreve no banco; 8.5).
 
@@ -36,7 +36,7 @@ export const FERRAMENTAS: Anthropic.Tool[] = [
   },
   {
     name: "jogos_de_hoje",
-    description: "Jogos de futebol (horário em UTC) de hoje (dias_a_frente 0) até 7 dias à frente. Com time, separa os jogos_do_time dos outros. Use o nome oficial do time (ex.: Corinthians, Palmeiras, São Paulo, Flamengo).",
+    description: "Jogos de futebol (inicio_sp já no horário de São Paulo) de hoje (dias_a_frente 0) até 7 dias à frente. Com time, separa os jogos_do_time dos outros. Use o nome oficial do time (ex.: Corinthians, Palmeiras, São Paulo, Flamengo).",
     input_schema: { type: "object", properties: { time: { type: "string" }, dias_a_frente: { type: "integer" } } },
   },
   {
@@ -139,6 +139,14 @@ export async function montarCardEntrada(p: Record<string, unknown>, db: AgenteDb
 // jogosDesatualizados (regra 12.5): a última atualização dos jogos falhou; o agente avisa na resposta.
 export type Turno = { cache: CacheTurno; blocos: Bloco[]; local: { latitude: number; longitude: number } | null; jogosDesatualizados?: boolean };
 
+// Horário de um jogo em São Paulo, no formato "sáb 14/11 20:30". Recebe: instante ISO (UTC). Devolve: texto.
+export function horarioSp(iso: string): string {
+  const d = new Date(iso);
+  const parte = (o: Intl.DateTimeFormatOptions) => d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", ...o });
+  const dia = parte({ weekday: "short" }).replace(".", "");
+  return `${dia} ${parte({ day: "2-digit", month: "2-digit" })} ${parte({ hour: "2-digit", minute: "2-digit", hour12: false })}`;
+}
+
 // Executa uma ferramenta. Recebe: nome, entrada, banco e turno. Devolve: o conteúdo (JSON) para o modelo.
 // Erros viram { erro } para o modelo — a ferramenta nunca derruba a conversa.
 export async function executarFerramenta(nome: string, entrada: Record<string, unknown>, db: AgenteDb, turno: Turno): Promise<string> {
@@ -184,12 +192,15 @@ export async function executarFerramenta(nome: string, entrada: Record<string, u
         for (const j of jogos) turno.cache.jogos.set(j.jogo_id, j);
         if (!emDia) turno.jogosDesatualizados = true;
         const aviso = emDia ? {} : { atualizacao_falhou: true };
+        // Bug do 8.11: o modelo recebe o horário já em São Paulo (inicio_sp), para não fazer conta de fuso em voz
+        // alta; o card "jogos" continua usando o inicio UTC do cache.
+        const paraModelo = (j: Jogo) => ({ jogo_id: j.jogo_id, competicao: j.competicao, mandante: j.mandante, visitante: j.visitante, inicio_sp: horarioSp(j.inicio) });
         // 8.9: diz ao modelo quais jogos são do time pedido (os demais vêm só como contexto).
         const norm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const doTime = time ? jogos.filter((j) => norm(`${j.mandante} ${j.visitante}`).includes(norm(time))) : [];
         return JSON.stringify(time
-          ? { time_pedido: time, jogos_do_time: doTime, outros_jogos: jogos.filter((j) => !doTime.includes(j)).slice(0, 10), ...aviso }
-          : { jogos, ...aviso });
+          ? { time_pedido: time, jogos_do_time: doTime.map(paraModelo), outros_jogos: jogos.filter((j) => !doTime.includes(j)).slice(0, 10).map(paraModelo), ...aviso }
+          : { jogos: jogos.map(paraModelo), ...aviso });
       }
       case "meu_passaporte": {
         const p = await db.meuPassaporte();
