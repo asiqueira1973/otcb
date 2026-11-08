@@ -468,6 +468,31 @@ $$;
 ALTER FUNCTION "public"."otcb_casar_ou_criar_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_place_id" "text", "p_criar" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_checar_edicao"("p_usuario" "uuid", "p_bar_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_op public.otcb_opinioes%rowtype;
+begin
+  if not exists (select 1 from public.otcb_bares b where b.id = p_bar_id and b.excluido_em is null) then
+    raise exception 'bar_inexistente' using errcode = 'P0001';
+  end if;
+  select * into v_op from public.otcb_opinioes where usuario_id = p_usuario and bar_id = p_bar_id;
+  if not found then
+    return false;
+  end if;
+  if v_op.edicoes_dia = public.otcb_hoje_sp() and v_op.edicoes_qtd >= 5 then
+    raise exception 'limite_edicao' using errcode = 'P0001';
+  end if;
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_checar_edicao"("p_usuario" "uuid", "p_bar_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_configurar_garimpo"("p_url_funcoes" "text", "p_segredo" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1086,6 +1111,65 @@ $$;
 ALTER FUNCTION "public"."otcb_recalcular_todos"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_recusar_edicao"("p_usuario" "uuid", "p_bar_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  update public.otcb_opinioes
+     set status = 'oculta_moderacao', motivo_ocultacao = 'moderacao'
+   where usuario_id = p_usuario and bar_id = p_bar_id and status = 'publicada';
+  return found;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_recusar_edicao"("p_usuario" "uuid", "p_bar_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_registrar_card"("p_tipo" "text", "p_bar_id" "uuid", "p_resultado" "text") RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_uid uuid := public.otcb_usuario_atual();
+  v_nome text;
+  v_texto text;
+  v_id uuid;
+begin
+  v_texto := case p_tipo || ':' || p_resultado
+    when 'confirmacao:tem_brahma_positivo' then 'A pessoa confirmou pelo card que o bar %s tem chopp Brahma.'
+    when 'confirmacao:tem_brahma_negativo' then 'A pessoa informou pelo card que o bar %s não tem mais chopp Brahma.'
+    when 'confirmacao:transmite_jogos_positivo' then 'A pessoa confirmou pelo card que o bar %s passa jogo.'
+    when 'confirmacao:transmite_jogos_negativo' then 'A pessoa informou pelo card que o bar %s não passa jogo.'
+    when 'confirmacao:funcionamento_fechado' then 'A pessoa informou pelo card que o bar %s fechou.'
+    when 'sugestao:criado' then 'A pessoa sugeriu pelo card o bar %s, que entrou na base como a confirmar.'
+    when 'sugestao:ja_existia' then 'A pessoa sugeriu pelo card o bar %s, que já estava na base; a sugestão contou como confirmação.'
+    when 'denuncia:registrada' then 'A pessoa denunciou pelo card uma opinião sobre o bar %s.'
+    else null end;
+  if v_texto is null then
+    raise exception 'dados_invalidos' using errcode = 'P0001';
+  end if;
+  select nome into v_nome from public.otcb_bares where id = p_bar_id and excluido_em is null;
+  if v_nome is null then
+    raise exception 'bar_inexistente' using errcode = 'P0001';
+  end if;
+  if (select count(*) from public.otcb_mensagens
+       where usuario_id = v_uid and papel = 'sistema'
+         and public.otcb_dia_sp(criado_em) = public.otcb_hoje_sp()) >= 30 then
+    raise exception 'limite_card' using errcode = 'P0001';
+  end if;
+  insert into public.otcb_mensagens (usuario_id, papel, conteudo)
+  values (v_uid, 'sistema', format(v_texto, v_nome))
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_registrar_card"("p_tipo" "text", "p_bar_id" "uuid", "p_resultado" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1164,6 +1248,44 @@ $$;
 
 
 ALTER FUNCTION "public"."otcb_regra_evidencia"("p_tipo" "public"."otcb_tipo_evidencia", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", OUT "peso" numeric, OUT "meia_vida_dias" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."otcb_salvar_opiniao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_texto" "text", "p_nota" smallint) RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_edicao boolean := public.otcb_checar_edicao(p_usuario, p_bar_id);
+  v_hoje date := public.otcb_hoje_sp();
+  v_id uuid;
+  v_nome text;
+begin
+  if v_edicao then
+    update public.otcb_opinioes o
+       set texto = p_texto,
+           nota = p_nota,
+           status = case when o.status in ('publicada', 'oculta_moderacao') then 'publicada' else o.status end,
+           motivo_ocultacao = case when o.status = 'oculta_moderacao' then null else o.motivo_ocultacao end,
+           edicoes_qtd = case when o.edicoes_dia = v_hoje then o.edicoes_qtd + 1 else 1 end,
+           edicoes_dia = v_hoje
+     where o.usuario_id = p_usuario and o.bar_id = p_bar_id
+     returning o.id into v_id;
+  else
+    insert into public.otcb_opinioes (usuario_id, bar_id, texto, nota)
+    values (p_usuario, p_bar_id, p_texto, p_nota)
+    returning id into v_id;
+  end if;
+  select nome into v_nome from public.otcb_bares where id = p_bar_id;
+  insert into public.otcb_mensagens (usuario_id, papel, conteudo)
+  values (p_usuario, 'sistema',
+          case when v_edicao then 'A pessoa editou a própria opinião sobre o bar ' else 'A pessoa publicou uma opinião sobre o bar ' end
+          || v_nome || ' pelo card.');
+  return v_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_salvar_opiniao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_texto" "text", "p_nota" smallint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) RETURNS "jsonb"
@@ -1398,12 +1520,22 @@ CREATE TABLE IF NOT EXISTS "public"."otcb_opinioes" (
     "qtd_denuncias" integer DEFAULT 0 NOT NULL,
     "criado_em" timestamp with time zone DEFAULT "now"() NOT NULL,
     "atualizado_em" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "edicoes_dia" "date",
+    "edicoes_qtd" smallint DEFAULT 0 NOT NULL,
     CONSTRAINT "otcb_opinioes_nota_faixa" CHECK ((("nota" IS NULL) OR (("nota" >= 1) AND ("nota" <= 5)))),
     CONSTRAINT "otcb_opinioes_texto_tamanho" CHECK ((("char_length"("texto") >= 10) AND ("char_length"("texto") <= 500)))
 );
 
 
 ALTER TABLE "public"."otcb_opinioes" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."otcb_opinioes"."edicoes_dia" IS 'Dia de São Paulo das edições contadas em edicoes_qtd (11.6).';
+
+
+
+COMMENT ON COLUMN "public"."otcb_opinioes"."edicoes_qtd" IS 'Edições da opinião no dia edicoes_dia; no máximo 5 (11.6).';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."otcb_perfis" (
@@ -1882,6 +2014,11 @@ GRANT ALL ON FUNCTION "public"."otcb_casar_ou_criar_bar"("p_nome" "text", "p_end
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_checar_edicao"("p_usuario" "uuid", "p_bar_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_checar_edicao"("p_usuario" "uuid", "p_bar_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."otcb_configurar_garimpo"("p_url_funcoes" "text", "p_segredo" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_configurar_garimpo"("p_url_funcoes" "text", "p_segredo" "text") TO "service_role";
 
@@ -2028,6 +2165,17 @@ GRANT ALL ON FUNCTION "public"."otcb_recalcular_todos"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_recusar_edicao"("p_usuario" "uuid", "p_bar_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_recusar_edicao"("p_usuario" "uuid", "p_bar_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_registrar_card"("p_tipo" "text", "p_bar_id" "uuid", "p_resultado" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_registrar_card"("p_tipo" "text", "p_bar_id" "uuid", "p_resultado" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."otcb_registrar_card"("p_tipo" "text", "p_bar_id" "uuid", "p_resultado" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) TO "service_role";
 
@@ -2035,6 +2183,11 @@ GRANT ALL ON FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uu
 
 REVOKE ALL ON FUNCTION "public"."otcb_regra_evidencia"("p_tipo" "public"."otcb_tipo_evidencia", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", OUT "peso" numeric, OUT "meia_vida_dias" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_regra_evidencia"("p_tipo" "public"."otcb_tipo_evidencia", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", OUT "peso" numeric, OUT "meia_vida_dias" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_salvar_opiniao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_texto" "text", "p_nota" smallint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_salvar_opiniao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_texto" "text", "p_nota" smallint) TO "service_role";
 
 
 
@@ -2107,15 +2260,47 @@ GRANT SELECT,DELETE ON TABLE "public"."otcb_mensagens" TO "authenticated";
 
 
 GRANT ALL ON TABLE "public"."otcb_opinioes" TO "service_role";
-GRANT SELECT,DELETE ON TABLE "public"."otcb_opinioes" TO "authenticated";
+GRANT DELETE ON TABLE "public"."otcb_opinioes" TO "authenticated";
 
 
 
-GRANT UPDATE("status") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+GRANT SELECT("id") ON TABLE "public"."otcb_opinioes" TO "authenticated";
 
 
 
-GRANT UPDATE("motivo_ocultacao") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+GRANT SELECT("usuario_id") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+
+
+
+GRANT SELECT("bar_id") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+
+
+
+GRANT SELECT("texto") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+
+
+
+GRANT SELECT("nota") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+
+
+
+GRANT SELECT("status"),UPDATE("status") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+
+
+
+GRANT SELECT("motivo_ocultacao"),UPDATE("motivo_ocultacao") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+
+
+
+GRANT SELECT("qtd_denuncias") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+
+
+
+GRANT SELECT("criado_em") ON TABLE "public"."otcb_opinioes" TO "authenticated";
+
+
+
+GRANT SELECT("atualizado_em") ON TABLE "public"."otcb_opinioes" TO "authenticated";
 
 
 

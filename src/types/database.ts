@@ -185,14 +185,14 @@ isOneToOne: false
                   ]
                 },"otcb_opinioes": {
                   Row: {
-                    "atualizado_em": string,"bar_id": string,"criado_em": string,"id": string,"motivo_ocultacao": string | null,"nota": number | null,"qtd_denuncias": number,"status": Database["public"]['Enums']["otcb_status_opiniao"],"texto": string,"usuario_id": string
+                    "atualizado_em": string,"bar_id": string,"criado_em": string,"edicoes_dia": string | null,"edicoes_qtd": number,"id": string,"motivo_ocultacao": string | null,"nota": number | null,"qtd_denuncias": number,"status": Database["public"]['Enums']["otcb_status_opiniao"],"texto": string,"usuario_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "atualizado_em"?: string,"bar_id": string,"criado_em"?: string,"id"?: string,"motivo_ocultacao"?: string | null,"nota"?: number | null,"qtd_denuncias"?: number,"status"?: Database["public"]['Enums']["otcb_status_opiniao"],"texto": string,"usuario_id": string
+                    "atualizado_em"?: string,"bar_id": string,"criado_em"?: string,"edicoes_dia"?: string | null,"edicoes_qtd"?: number,"id"?: string,"motivo_ocultacao"?: string | null,"nota"?: number | null,"qtd_denuncias"?: number,"status"?: Database["public"]['Enums']["otcb_status_opiniao"],"texto": string,"usuario_id": string
                   }
                   Update: {
-                    "atualizado_em"?: string,"bar_id"?: string,"criado_em"?: string,"id"?: string,"motivo_ocultacao"?: string | null,"nota"?: number | null,"qtd_denuncias"?: number,"status"?: Database["public"]['Enums']["otcb_status_opiniao"],"texto"?: string,"usuario_id"?: string
+                    "atualizado_em"?: string,"bar_id"?: string,"criado_em"?: string,"edicoes_dia"?: string | null,"edicoes_qtd"?: number,"id"?: string,"motivo_ocultacao"?: string | null,"nota"?: number | null,"qtd_denuncias"?: number,"status"?: Database["public"]['Enums']["otcb_status_opiniao"],"texto"?: string,"usuario_id"?: string
                   }
                   Relationships: [
                     {
@@ -277,6 +277,9 @@ isOneToOne: false
 "otcb_casar_ou_criar_bar":
 { Args: { "p_bairro": string,"p_criar": boolean,"p_endereco": string,"p_latitude": number,"p_longitude": number,"p_nome": string,"p_place_id": string }; Returns: Json
                            },
+"otcb_checar_edicao":
+{ Args: { "p_bar_id": string,"p_usuario": string }; Returns: boolean
+                           },
 "otcb_configurar_garimpo":
 { Args: { "p_segredo": string,"p_url_funcoes": string }; Returns: undefined
                            },
@@ -344,11 +347,20 @@ isOneToOne: false
 "otcb_recalcular_todos":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
+"otcb_recusar_edicao":
+{ Args: { "p_bar_id": string,"p_usuario": string }; Returns: boolean
+                           },
+"otcb_registrar_card":
+{ Args: { "p_bar_id": string,"p_resultado": string,"p_tipo": string }; Returns: string
+                           },
 "otcb_registrar_evidencia_garimpo":
 { Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_bar_id": string,"p_data_evidencia": string,"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"],"p_tipo": Database["public"]['Enums']["otcb_tipo_evidencia"],"p_trecho": string,"p_url_fonte": string }; Returns: string
                            },
 "otcb_regra_evidencia":
 { Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"],"p_tipo": Database["public"]['Enums']["otcb_tipo_evidencia"] }; Returns: Record<string, unknown>
+                           },
+"otcb_salvar_opiniao":
+{ Args: { "p_bar_id": string,"p_nota": number,"p_texto": string,"p_usuario": string }; Returns: string
                            },
 "otcb_sugerir_bar":
 { Args: { "p_bairro": string,"p_endereco": string,"p_latitude": number,"p_longitude": number,"p_nome": string,"p_tem_brahma": boolean }; Returns: Json
