@@ -540,6 +540,6 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | A6 sem Lottie (8.6) | Carimbo e confete feitos com o Reanimated. | Mesma decisão da A9. |
 | Selo novo no resultado (8.6) | `otcb_resultado_foto` não diz se saiu selo. | Fica para o Passaporte (8.7), que calcula os selos. |
 | Mensagens locais no aparelho (8.6) | Resultado do Colarinhômetro e cards da Ficha guardados no AsyncStorage por 30 dias. | O bloco de resultado não é gravado em `otcb_mensagens`, porque só o agente grava lá (6.1). |
-| Selo e foto apagada (8.7) | O selo "Olho clínico" continua contando a foto apagada pelo dono. | A 11.11 não trata o caso; segue o critério 3 do 8.7, em que a conquista não regride, como o carimbo. |
+| Selo e foto apagada (8.7) | O selo "Olho clínico" continua contando a foto apagada pelo dono. | A 11.11 não trata o caso; segue o critério 3 do 8.7, em que a conquista não regride, como o carimbo. Confirmado pelo Alexandre (08/11/2026). |
 | Clássicos (8.7) | A coleção só aparece quando há bar clássico. | A 25.5 foi adiada pelo Alexandre (começar sem clássicos). |
 | Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |
