@@ -2,7 +2,7 @@ import Anthropic from "npm:@anthropic-ai/sdk@^0";
 
 import { CacheTurno } from "./blocos.ts";
 import { executarFerramenta, FERRAMENTAS, type Turno } from "./ferramentas.ts";
-import { PROMPT_AGENTE_V1 } from "./prompts/agente.v1.ts";
+import { PROMPT_AGENTE_V2 } from "./prompts/agente.v2.ts";
 import type { AgenteDb, Bloco } from "./tipos.ts";
 
 // Loop do agente do chat (seções 4.1, 13.1 e 13.3). Modelo da seção 4.1: claude-sonnet-5-5.
@@ -28,6 +28,9 @@ export function criarModeloAnthropic(apiKey: string): ModeloAgente {
   const client = new Anthropic({ apiKey, maxRetries: 1, timeout: 20_000 });
   return { criar: (params) => client.messages.create(params) };
 }
+
+// Contagem de tokens do turno, só números (vai ao log para acompanhar latência e cache; seção 20).
+export type UsoTurno = { chamadas: number; cache_lido: number; cache_gravado: number; entrada: number };
 
 export type EntradaAgente = {
   mensagem: string;
@@ -69,15 +72,16 @@ export function contextoDoTurno(entrada: EntradaAgente): string {
 
 // Executa o turno. Recebe: entrada, banco (para as ferramentas) e modelo. Devolve: texto e blocos.
 // Lança IaIndisponivel se o modelo falhar ou não produzir texto nem blocos.
-export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: ModeloAgente): Promise<{ texto: string; blocos: Bloco[] }> {
+export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: ModeloAgente): Promise<{ texto: string; blocos: Bloco[]; uso: UsoTurno }> {
   const turno: Turno = { cache: new CacheTurno(), blocos: [], local: entrada.local };
   const messages = montarMensagens(entrada);
   // O prompt fixo e as ferramentas ficam em cache (prefixo estável); o contexto do turno vem depois.
   const system: Anthropic.TextBlockParam[] = [
-    { type: "text", text: PROMPT_AGENTE_V1, cache_control: { type: "ephemeral" } },
+    { type: "text", text: PROMPT_AGENTE_V2, cache_control: { type: "ephemeral" } },
     { type: "text", text: contextoDoTurno(entrada) },
   ];
   const textos: string[] = [];
+  const uso: UsoTurno = { chamadas: 0, cache_lido: 0, cache_gravado: 0, entrada: 0 };
 
   for (let rodada = 0; rodada <= MAX_RODADAS; rodada++) {
     let resposta: Anthropic.Message;
@@ -89,6 +93,7 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
         tools: FERRAMENTAS,
         tool_choice: rodada === MAX_RODADAS ? { type: "none" } : { type: "auto" },
         messages,
+        // Critério 8: esforço baixo. O claude-sonnet-5-5 não aceita thinking desligado (400, testado em 8.4).
         output_config: { effort: "low" },
       } as Anthropic.MessageCreateParamsNonStreaming);
     } catch (error) {
@@ -96,6 +101,10 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
       throw new IaIndisponivel(`modelo_${status}`);
     }
     if (resposta.stop_reason === "refusal") throw new IaIndisponivel("recusa");
+    uso.chamadas += 1;
+    uso.cache_lido += resposta.usage?.cache_read_input_tokens ?? 0;
+    uso.cache_gravado += resposta.usage?.cache_creation_input_tokens ?? 0;
+    uso.entrada += resposta.usage?.input_tokens ?? 0;
 
     const texto = resposta.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("").trim();
     if (texto) textos.push(texto);
@@ -108,10 +117,14 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
       const conteudo = await executarFerramenta(uso.name, (uso.input ?? {}) as Record<string, unknown>, db, turno);
       resultados.push({ type: "tool_result", tool_use_id: uso.id, content: conteudo });
     }
+    // Critério 8 (p95 < 8 s): "mostrar" só ecoa; se a rodada já trouxe o texto e só mostrou cards, a
+    // resposta está pronta e não há outra chamada ao modelo (o prompt v2 pede o texto junto com o mostrar).
+    // Sem texto, segue mais uma rodada para o modelo escrever.
+    if (texto && usos.every((u) => u.name === "mostrar")) break;
     messages.push({ role: "user", content: resultados });
   }
 
   const texto = textos.join("\n\n").trim();
   if (!texto && turno.blocos.length === 0) throw new IaIndisponivel("resposta_vazia");
-  return { texto, blocos: turno.blocos };
+  return { texto, blocos: turno.blocos, uso };
 }

@@ -75,13 +75,14 @@ export async function handleAgente(req: Request, deps: DepsAgente): Promise<Resp
       return json(200, { mensagem_id: respostaId, texto: guardrail.resposta, blocos: [], bloqueada_guardrail: true });
     }
 
+    // Limite, contexto e perfil em paralelo (critério 8: cada ida ao banco soma na latência).
+    const [hoje, historico, perfil] = await Promise.all([db.mensagensHoje(usuarioId), db.contexto(usuarioId), db.perfil(usuarioId)]);
     // 11.6: a 41ª mensagem do dia não chega ao modelo nem é gravada.
-    if (await db.mensagensHoje(usuarioId) >= LIMITE_DIARIO) {
+    if (hoje >= LIMITE_DIARIO) {
       deps.log({ evento: "limite_mensagens" });
       return json(429, { codigo: "limite_mensagens", texto: TEXTOS.limiteMensagens });
     }
 
-    const [historico, perfil] = await Promise.all([db.contexto(usuarioId), db.perfil(usuarioId)]);
     const inicio = Date.now();
     let resultado;
     try {
@@ -98,7 +99,7 @@ export async function handleAgente(req: Request, deps: DepsAgente): Promise<Resp
       { papel: "usuario", conteudo: entrada.mensagem, blocos: null },
       { papel: "assistente", conteudo: texto, blocos: resultado.blocos.length > 0 ? resultado.blocos : null },
     ]);
-    deps.log({ evento: "resposta", ms: Date.now() - inicio, blocos: resultado.blocos.map((b) => b.tipo) });
+    deps.log({ evento: "resposta", ms: Date.now() - inicio, blocos: resultado.blocos.map((b) => b.tipo), ...resultado.uso });
     return json(200, { mensagem_id: respostaId, texto, blocos: resultado.blocos, bloqueada_guardrail: false });
   } catch (error) {
     // Sem detalhes: nada de texto da pessoa, token ou chave no log (seção 20).
