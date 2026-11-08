@@ -1528,6 +1528,7 @@ CREATE TABLE IF NOT EXISTS "public"."otcb_fotos" (
     "modelo_ia" "text" NOT NULL,
     "excluido_em" timestamp with time zone,
     "criado_em" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "pessoa_identificavel" boolean,
     CONSTRAINT "otcb_fotos_caminho_do_dono" CHECK (("caminho_storage" ~~ (("usuario_id")::"text" || '/%'::"text"))),
     CONSTRAINT "otcb_fotos_distancia_com_bar" CHECK ((("bar_id" IS NOT NULL) OR ("distancia_bar_metros" IS NULL))),
     CONSTRAINT "otcb_fotos_notas_faixa" CHECK ((((COALESCE("nota_altura", (0)::numeric) >= (0)::numeric) AND (COALESCE("nota_altura", (0)::numeric) <= (10)::numeric)) AND ((COALESCE("nota_cremosidade", (0)::numeric) >= (0)::numeric) AND (COALESCE("nota_cremosidade", (0)::numeric) <= (10)::numeric)) AND ((COALESCE("nota_copo", (0)::numeric) >= (0)::numeric) AND (COALESCE("nota_copo", (0)::numeric) <= (10)::numeric)) AND ((COALESCE("nota_gelado", (0)::numeric) >= (0)::numeric) AND (COALESCE("nota_gelado", (0)::numeric) <= (10)::numeric)) AND ((COALESCE("nota_colarinho", (0)::numeric) >= (0)::numeric) AND (COALESCE("nota_colarinho", (0)::numeric) <= (10)::numeric))))
@@ -1535,6 +1536,10 @@ CREATE TABLE IF NOT EXISTS "public"."otcb_fotos" (
 
 
 ALTER TABLE "public"."otcb_fotos" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."otcb_fotos"."pessoa_identificavel" IS 'A IA viu rosto de pessoa reconhecível (13.5); orienta a v2 de fotos públicas.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."otcb_jogos" (
@@ -2306,11 +2311,70 @@ GRANT SELECT ON TABLE "public"."otcb_execucoes_garimpo" TO "authenticated";
 
 
 GRANT ALL ON TABLE "public"."otcb_fotos" TO "service_role";
-GRANT SELECT ON TABLE "public"."otcb_fotos" TO "authenticated";
 
 
 
-GRANT UPDATE("excluido_em") ON TABLE "public"."otcb_fotos" TO "authenticated";
+GRANT SELECT("id") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("usuario_id") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("bar_id") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("distancia_bar_metros") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("caminho_storage") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("e_chopp") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("usuario_confirmou_brahma") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("nota_altura") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("nota_cremosidade") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("nota_copo") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("nota_gelado") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("nota_colarinho") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("comentario_ia") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("modelo_ia") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("excluido_em"),UPDATE("excluido_em") ON TABLE "public"."otcb_fotos" TO "authenticated";
+
+
+
+GRANT SELECT("criado_em") ON TABLE "public"."otcb_fotos" TO "authenticated";
 
 
 

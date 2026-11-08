@@ -125,14 +125,14 @@ isOneToOne: false
                   ]
                 },"otcb_fotos": {
                   Row: {
-                    "bar_id": string | null,"caminho_storage": string,"comentario_ia": string | null,"criado_em": string,"distancia_bar_metros": number | null,"e_chopp": boolean,"excluido_em": string | null,"id": string,"modelo_ia": string,"nota_altura": number | null,"nota_colarinho": number | null,"nota_copo": number | null,"nota_cremosidade": number | null,"nota_gelado": number | null,"usuario_confirmou_brahma": boolean,"usuario_id": string
+                    "bar_id": string | null,"caminho_storage": string,"comentario_ia": string | null,"criado_em": string,"distancia_bar_metros": number | null,"e_chopp": boolean,"excluido_em": string | null,"id": string,"modelo_ia": string,"nota_altura": number | null,"nota_colarinho": number | null,"nota_copo": number | null,"nota_cremosidade": number | null,"nota_gelado": number | null,"pessoa_identificavel": boolean | null,"usuario_confirmou_brahma": boolean,"usuario_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "bar_id"?: string | null,"caminho_storage": string,"comentario_ia"?: string | null,"criado_em"?: string,"distancia_bar_metros"?: number | null,"e_chopp": boolean,"excluido_em"?: string | null,"id"?: string,"modelo_ia": string,"nota_altura"?: number | null,"nota_colarinho"?: number | null,"nota_copo"?: number | null,"nota_cremosidade"?: number | null,"nota_gelado"?: number | null,"usuario_confirmou_brahma": boolean,"usuario_id": string
+                    "bar_id"?: string | null,"caminho_storage": string,"comentario_ia"?: string | null,"criado_em"?: string,"distancia_bar_metros"?: number | null,"e_chopp": boolean,"excluido_em"?: string | null,"id"?: string,"modelo_ia": string,"nota_altura"?: number | null,"nota_colarinho"?: number | null,"nota_copo"?: number | null,"nota_cremosidade"?: number | null,"nota_gelado"?: number | null,"pessoa_identificavel"?: boolean | null,"usuario_confirmou_brahma": boolean,"usuario_id": string
                   }
                   Update: {
-                    "bar_id"?: string | null,"caminho_storage"?: string,"comentario_ia"?: string | null,"criado_em"?: string,"distancia_bar_metros"?: number | null,"e_chopp"?: boolean,"excluido_em"?: string | null,"id"?: string,"modelo_ia"?: string,"nota_altura"?: number | null,"nota_colarinho"?: number | null,"nota_copo"?: number | null,"nota_cremosidade"?: number | null,"nota_gelado"?: number | null,"usuario_confirmou_brahma"?: boolean,"usuario_id"?: string
+                    "bar_id"?: string | null,"caminho_storage"?: string,"comentario_ia"?: string | null,"criado_em"?: string,"distancia_bar_metros"?: number | null,"e_chopp"?: boolean,"excluido_em"?: string | null,"id"?: string,"modelo_ia"?: string,"nota_altura"?: number | null,"nota_colarinho"?: number | null,"nota_copo"?: number | null,"nota_cremosidade"?: number | null,"nota_gelado"?: number | null,"pessoa_identificavel"?: boolean | null,"usuario_confirmou_brahma"?: boolean,"usuario_id"?: string
                   }
                   Relationships: [
                     {
