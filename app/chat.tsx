@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mascot } from '../src/components/Mascot';
 import { fonts, useTheme } from '../src/components/theme';
 import { BarSheetProvider } from '../src/features/bares/BarSheet';
-import { showComingSoon } from '../src/features/chat/comingSoon';
 import { enviarFila } from '../src/features/colarinhometro/enviar';
 import { ouvirResultados } from '../src/features/colarinhometro/resultados';
 import { MessageRow } from '../src/features/chat/MessageRow';
@@ -62,7 +61,7 @@ export default function Chat() {
         <View style={styles.header}>
           <Text accessibilityRole="header" style={[styles.brand, { color: theme.accent }]}>{copy.brand}</Text>
           <View style={styles.shortcuts}>
-            <Pressable testID="atalho-passaporte" accessibilityRole="button" accessibilityLabel={copy.chat.passport} onPress={showComingSoon} style={styles.shortcut}>
+            <Pressable testID="atalho-passaporte" accessibilityRole="button" accessibilityLabel={copy.chat.passport} onPress={() => router.push('/passaporte')} style={styles.shortcut}>
               <Text style={[styles.shortcutText, { color: theme.link }]}>{copy.chat.passport}</Text>
             </Pressable>
             <Pressable testID="atalho-perfil" accessibilityRole="button" accessibilityLabel={copy.chat.profile} onPress={() => router.push('/perfil')} style={styles.shortcut}>

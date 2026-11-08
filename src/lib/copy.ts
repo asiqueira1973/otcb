@@ -179,6 +179,34 @@ export const copy = {
     expired: 'Uma foto passou 24 horas na fila sem sinal e foi descartada.', // 12.4 (proposto 8.6)
     tooBig: 'A foto ficou grande demais. Tenta de novo.', // (proposto 8.6)
   },
+  // Passaporte (8.7)
+  passport: {
+    title: 'Passaporte', // T8
+    // 15.5
+    empty: 'Seu passaporte tá em branco. Tira a foto do próximo chopp e ganha o primeiro carimbo.',
+    openCamera: 'Abrir o Colarinhômetro', // (proposto 8.7)
+    stamped: (n: number) => (n === 1 ? '1 bar carimbado' : `${n} bares carimbados`), // (proposto 8.7)
+    stamps: 'Carimbos', // (proposto 8.7)
+    neighborhoods: 'Bairros', // (proposto 8.7)
+    classics: 'Clássicos', // 11.11
+    seals: 'Selos', // (proposto 8.7)
+    progress: (feito: number, total: number) => `${feito}/${total}`, // (proposto 8.7)
+    conquered: 'conquistado', // (proposto 8.7)
+    level: (n: number) => `nível ${n}`, // (proposto 8.7)
+    newSeal: (nome: string) => `Selo novo: ${nome}!`, // (proposto 8.7)
+    offline: 'Sem sinal: mostrando o último passaporte que carregou.', // (proposto 8.7)
+    back: 'Voltar', // (proposto 8.7)
+    stampLabel: (bar: string, data: string) => `Carimbo do ${bar}, ${data}. Abrir a ficha.`, // (proposto 8.7) leitor de tela
+    neighborhoodLabel: (bairro: string, feito: number, total: number) => `${bairro}: ${feito} de ${total} bares`, // (proposto 8.7)
+    // Descrições dos selos da 11.11 (proposto 8.7). Nenhuma fala em quantidade de chopp ou de fotos (princípio 3).
+    sealHow: {
+      primeira_tirada: 'Seu primeiro carimbo.',
+      explorador: 'Carimbos em bares diferentes.',
+      andarilho: 'Carimbos em 5 bairros.',
+      olho_clinico: 'Colarinho nota 9 ou mais em 5 bares.',
+      informante: 'Dicas que ajudaram a confirmar bares com chopp Brahma.',
+    } as Record<string, string>,
+  },
   // Nomes dos selos da regra 11.11 (proposto 8.4)
   seals: {
     primeira_tirada: 'Primeira tirada',

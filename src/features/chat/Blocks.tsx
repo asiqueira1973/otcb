@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { fonts, useTheme } from '../../components/theme';
@@ -45,6 +45,7 @@ export function Blocks({ blocos, messageId = "local", animar = false }: Props) {
     else if (a.acao === 'abrir_rota' && bar) void openDirections('mapas', bar);
     else if (a.acao === 'chamar_uber' && bar) void openDirections('uber', bar);
     else if (a.acao === 'abrir_camera') router.push('/camera');
+    else if (a.acao === 'abrir_passaporte') router.push('/passaporte');
     else showComingSoon();
   }
 
@@ -81,14 +82,20 @@ export function Blocks({ blocos, messageId = "local", animar = false }: Props) {
             );
           case 'passaporte':
             return (
-              <View key={i} testID="bloco-passaporte" style={[styles.box, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Pressable
+                key={i}
+                testID="bloco-passaporte"
+                accessibilityRole="button"
+                onPress={() => router.push('/passaporte')}
+                style={[styles.box, { backgroundColor: theme.card, borderColor: theme.border }]}
+              >
                 <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{copy.blocks.passport}</Text>
                 <Text style={[styles.body, { color: theme.text }]}>{copy.blocks.stamps(b.total_carimbos)}</Text>
                 <Text style={[styles.body, { color: theme.text }]}>{copy.blocks.neighborhoods(b.bairros_conquistados)}</Text>
                 {b.ultimo_selo ? (
                   <Text style={[styles.body, { color: theme.text }]}>{copy.blocks.lastSeal(copy.seals[b.ultimo_selo] ?? b.ultimo_selo)}</Text>
                 ) : null}
-              </View>
+              </Pressable>
             );
           case 'pergunta_confirmacao':
             return <ConfirmationCard key={i} chave={`${messageId}:${i}`} barId={b.bar_id} assunto={b.assunto} pergunta={b.pergunta} />;
