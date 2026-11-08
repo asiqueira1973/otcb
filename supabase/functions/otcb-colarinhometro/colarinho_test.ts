@@ -137,3 +137,15 @@ Deno.test("12.5: saída fora do contrato ganha 1 nova tentativa; comentário cor
   assertEquals(a.comentario.length, 120);
   assertEquals(validarAvaliacao({ ...CHOPP, nota_altura: 11 }), null);
 });
+
+Deno.test("bug real do 8.6: comentário longo é cortado no fim de palavra, com reticências, até 120 caracteres", () => {
+  const longo = "Colarinho de dois dedos certinho, copo suado de tanto gelar e um balcão de madeira caprichado. Esse chopp está pedindo para ser fotografado.";
+  const v = validarAvaliacao({ ...CHOPP, comentario: longo })!;
+  assert(v.comentario.length <= 120, `${v.comentario.length}`);
+  assert(v.comentario.endsWith("…"));
+  assertFalse(/\s\S{1,2}…$/.test(v.comentario) && !longo.includes(v.comentario.slice(0, -1) + " "));
+  assert(longo.startsWith(v.comentario.slice(0, -1).trimEnd()));
+  assert(/[\p{L}.,!]…$/u.test(v.comentario), v.comentario);
+  assertEquals(validarAvaliacao({ ...CHOPP, comentario: "Curto e bom." })!.comentario, "Curto e bom.");
+  assert(longo.charAt(v.comentario.length - 1) === " " || /[.,!]/.test(v.comentario.at(-2)!), "termina numa palavra inteira");
+});
