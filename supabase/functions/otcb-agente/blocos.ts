@@ -11,6 +11,8 @@ export class CacheTurno {
   bares = new Map<string, CardBar>();
   jogos = new Map<string, Jogo>();
   passaporte: { total_carimbos: number; bairros_conquistados: number; ultimo_selo: string | null } | null = null;
+  // opiniao_id → bar_id das opiniões vistas no turno (só elas podem virar formulario_denuncia).
+  opinioes = new Map<string, string>();
 }
 
 // Converte uma linha de otcb_buscar_bares / otcb_detalhes_bar em CardBar; null se o status não é visível.

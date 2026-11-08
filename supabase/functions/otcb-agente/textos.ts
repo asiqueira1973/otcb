@@ -11,4 +11,8 @@ export const TEXTOS = {
   iaFora: "Deu um branco aqui do nosso lado. Tenta de novo em instantes.",
   // (proposto 8.4) quando o modelo devolve só cards, sem texto
   soCards: "Olha o que eu achei:",
+  // Perguntas do card pergunta_confirmacao (8.5; proposto 8.5): montadas pelo servidor, não pelo modelo.
+  perguntaTemBrahma: (bar: string) => `O ${bar} ainda tem chopp Brahma?`,
+  perguntaJogos: (bar: string) => `O ${bar} passa jogo?`,
+  perguntaFuncionamento: (bar: string) => `O ${bar} continua aberto?`,
 } as const;

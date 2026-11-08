@@ -25,7 +25,12 @@ export type Bloco =
   | { tipo: "mapa"; pontos: Pick<CardBar, "bar_id" | "nome" | "latitude" | "longitude" | "status">[] }
   | { tipo: "jogos"; jogos: Jogo[] }
   | { tipo: "passaporte"; total_carimbos: number; bairros_conquistados: number; ultimo_selo: string | null }
-  | { tipo: "acao"; acao: "abrir_camera" | "abrir_rota" | "chamar_uber" | "abrir_ficha" | "abrir_passaporte"; bar_id?: string; rotulo: string };
+  | { tipo: "acao"; acao: "abrir_camera" | "abrir_rota" | "chamar_uber" | "abrir_ficha" | "abrir_passaporte"; bar_id?: string; rotulo: string }
+  // Blocos de entrada (8.5): o servidor monta; a pessoa preenche e grava no próprio card, sem o modelo.
+  | { tipo: "pergunta_confirmacao"; bar_id: string; nome_bar: string; assunto: "tem_brahma" | "transmite_jogos" | "funcionamento"; pergunta: string }
+  | { tipo: "formulario_opiniao"; bar_id: string; nome_bar: string; texto_atual: string | null; nota_atual: number | null }
+  | { tipo: "formulario_sugestao_bar"; nome: string | null; endereco: string | null; bairro: string | null; usar_localizacao_atual: boolean }
+  | { tipo: "formulario_denuncia"; opiniao_id: string };
 
 // Acesso a dados usado pelo agente. As consultas de bares usam o JWT do usuário (RLS; 13.3); o resto, serviço.
 export interface AgenteDb {
@@ -40,4 +45,6 @@ export interface AgenteDb {
   opinioesDoBar(barId: string, pagina: number): Promise<{ opiniao_id: string; apelido: string; nota: number | null; texto: string; criado_em: string }[]>;
   jogos(time: string | null, diasAFrente: number): Promise<Jogo[]>;
   meuPassaporte(): Promise<Record<string, unknown>>;
+  // Opinião atual da própria pessoa sobre o bar (critério 5 do 8.5), lida com o JWT dela (RLS).
+  minhaOpiniao(barId: string): Promise<{ texto: string; nota: number | null } | null>;
 }

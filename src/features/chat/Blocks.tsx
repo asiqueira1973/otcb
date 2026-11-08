@@ -8,10 +8,14 @@ import { useBarSheet } from '../bares/BarSheet';
 import { formatKickoff } from '../bares/format';
 import { openDirections } from '../bares/links';
 import { MiniMap } from '../bares/MiniMap';
+import { ConfirmationCard } from '../cards/ConfirmationCard';
+import { OpinionForm } from '../cards/OpinionForm';
+import { ReportForm } from '../cards/ReportForm';
+import { SuggestionForm } from '../cards/SuggestionForm';
 import { showComingSoon } from './comingSoon';
 import type { Bloco, CardBar } from './types';
 
-type Props = { blocos: Bloco[] };
+type Props = { blocos: Bloco[]; messageId?: string };
 
 // Bares conhecidos na mensagem (para as ações rota/Uber/ficha acharem as coordenadas). Recebe: blocos. Devolve: mapa id→bar.
 function knownBars(blocos: Bloco[]): Map<string, Pick<CardBar, 'bar_id' | 'nome' | 'latitude' | 'longitude'>> {
@@ -24,9 +28,10 @@ function knownBars(blocos: Bloco[]): Map<string, Pick<CardBar, 'bar_id' | 'nome'
   return m;
 }
 
-// Renderiza os blocos de exibição da 13.2 numa resposta do agente. Tipo desconhecido é ignorado
-// (os blocos de entrada chegam no 8.5). Recebe: blocos. Devolve: a pilha de cards.
-export function Blocks({ blocos }: Props) {
+// Renderiza os blocos da 13.2 numa resposta: os de exibição (8.4) e os de entrada (8.5), cada card de
+// entrada com chave própria (mensagem + posição) para guardar o estado "registrado". Tipo desconhecido é
+// ignorado. Recebe: blocos e id da mensagem. Devolve: a pilha de cards.
+export function Blocks({ blocos, messageId = "local" }: Props) {
   const theme = useTheme();
   const { openBar } = useBarSheet();
   const bars = knownBars(blocos);
@@ -82,6 +87,14 @@ export function Blocks({ blocos }: Props) {
                 ) : null}
               </View>
             );
+          case 'pergunta_confirmacao':
+            return <ConfirmationCard key={i} chave={`${messageId}:${i}`} barId={b.bar_id} assunto={b.assunto} pergunta={b.pergunta} />;
+          case 'formulario_opiniao':
+            return <OpinionForm key={i} chave={`${messageId}:${i}`} barId={b.bar_id} nomeBar={b.nome_bar} textoAtual={b.texto_atual} notaAtual={b.nota_atual} />;
+          case 'formulario_sugestao_bar':
+            return <SuggestionForm key={i} chave={`${messageId}:${i}`} nome={b.nome} endereco={b.endereco} bairro={b.bairro} usarLocalizacaoAtual={b.usar_localizacao_atual} />;
+          case 'formulario_denuncia':
+            return <ReportForm key={i} chave={`${messageId}:${i}`} opiniaoId={b.opiniao_id} />;
           default:
             return null;
         }

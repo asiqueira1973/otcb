@@ -184,6 +184,17 @@ Todas valem só para `authenticated` e usam `auth.uid()`.
 
 O cliente passou a ler `otcb_perfis` por coluna (todas menos `revisao_menor_em`).
 
+### Funções dos cards (épico 8.5)
+
+| Nome | Quem chama | O que faz |
+|---|---|---|
+| `otcb_checar_edicao(usuario, bar)` | serviço (`otcb-opinioes`) | Diz se é edição e aplica o limite de 5 edições por dia (11.6) antes de gastar IA. |
+| `otcb_salvar_opiniao(usuario, bar, texto, nota)` | serviço | Upsert da opinião aprovada (uma por bar). `oculta_moderacao` volta a `publicada`; ocultas por denúncia ou admin continuam ocultas. Grava a mensagem `sistema`. |
+| `otcb_recusar_edicao(usuario, bar)` | serviço | Edição recusada: a versão publicada vira `oculta_moderacao` (11.7). |
+| `otcb_registrar_card(tipo, bar, resultado)` | app (`authenticated`) | Mensagem `sistema` (11.13) com texto montado no banco a partir de uma lista fixa de tipo e resultado (sem texto livre do cliente). Limite de 30 por dia. |
+
+Colunas novas: `otcb_opinioes.edicoes_dia` e `edicoes_qtd`, que só o serviço grava e o cliente não lê.
+
 ### Jobs do `pg_cron` (horários em UTC; São Paulo é UTC−3)
 
 | Job | Quando | Chama |
@@ -209,6 +220,7 @@ O `otcb_cron_jogos` entra no épico 8.9.
 | T10 Bloqueio | `app/(onboarding)/bloqueio.tsx` | — | — |
 | T5 Chat | `app/chat.tsx` + `src/features/chat/` | `otcb_mensagens` (histórico próprio) | Edge Function `otcb-agente` |
 | T6 Ficha do bar | `src/features/bares/BarSheet.tsx` | `otcb_detalhes_bar`, `otcb_opinioes_do_bar` | Links de rota e Uber (13.2) |
+| Cards de entrada (8.5) | `src/features/cards/` | `otcb_opinioes` (a própria) | `otcb_confirmar_bar`, `otcb_sugerir_bar`, `otcb_registrar_card`, insert em `otcb_denuncias`, Edge Function `otcb-opinioes` |
 | T9 Perfil (mínimo) | `app/perfil.tsx` | — | `delete` em `otcb_mensagens` (próprias) |
 
 ## 5. Lógica por tela, Edge Function e script
@@ -342,6 +354,47 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - o script faz uma chamada de aquecimento fora da conta;
   - resultado final em 08/11/2026: 40/40, p50 5,2 s, p95 6,9 s (Wi-Fi, 34 respostas do modelo, função aquecida). Não foi medido em 4G; o Alexandre aceitou a medida em Wi-Fi para o critério 8 (08/11/2026).
 
+### Cards de entrada (8.5)
+- **Estados** (`useCardSubmit`): editando → enviando → registrado (check verde com "pop", A8, haptics) | aviso (15.8, "Não sei", limites) | recusado (15.7, continua editável) | erro (15.9, com "tentar de novo").
+- **Persistência:** registrado e aviso ficam no AsyncStorage pela chave mensagem + posição, e o card continua assim ao recarregar o histórico.
+- **Confirmação:**
+  - "Tem sim", "Não tem mais" e "Fechou", ou "Passa" e "Não passa", chamam `otcb_confirmar_bar`;
+  - repetir no mesmo dia mostra a 15.8.
+- **Opinião:**
+  - texto de 10 a 500 caracteres (fora disso o botão fica desabilitado) e estrelas opcionais;
+  - publica pela `otcb-opinioes`;
+  - abrir pela Ficha traz a opinião atual (edição).
+- **Sugestão:**
+  - nome, endereço e bairro;
+  - coordenadas: com "Estou no bar agora", o GPS do momento; sem isso, o `Location.geocodeAsync` do sistema;
+  - "Não sei" não grava nada (decisão do Alexandre);
+  - bar parecido a até 80 m mostra a 15.18.
+- **Denúncia:**
+  - insert com RLS, uma por opinião;
+  - "Denunciar" não aparece na própria opinião, que o app identifica pelo apelido.
+- **Ficha:** "Dar opinião" e "Tem Brahma?" fecham a ficha e colocam o card no chat como fala local, sem chamar o agente.
+- **Depois de gravar:** confirmação, sugestão e denúncia chamam `otcb_registrar_card` para o agente saber o que aconteceu; a opinião grava a nota pela própria função.
+
+### Edge Function `otcb-opinioes` (13.7; regra 11.7)
+- **Entrada:** JWT e `{bar_id, texto 10–500, nota 1–5|null}` (fora disso, 422 `dados_invalidos`).
+- **Ordem:**
+  1. limite de edição (429 `limite_edicao`, sem gastar IA);
+  2. lista de termos (`bloqueio.ts`: telefone, e-mail, links e spam, consumo excessivo, ofensas e ódio explícitos);
+  3. `claude-haiku-5-5` com saída estruturada `{permitida, motivo}`; o texto vai entre `<opiniao>` e é tratado só como conteúdo.
+- **Respostas:**
+  - recusa → 422 `recusada_moderacao`, nada é gravado, e numa edição a versão publicada é ocultada;
+  - falha da IA → 503 e não publica;
+  - sucesso → 200 `{opiniao_id, status:"publicada"}`.
+- **Log:** só evento, origem e motivo; nunca o texto.
+
+### Agente: `oferecer_card` (8.5)
+- O servidor monta o bloco de entrada:
+  - `pergunta_confirmacao` só para bar do turno, com a pergunta escrita pelo servidor;
+  - `formulario_opiniao` com a opinião atual da pessoa;
+  - `formulario_sugestao_bar` com os campos cortados no tamanho do banco;
+  - `formulario_denuncia` só para opinião vista no turno.
+- O agente continua sem ferramenta que grava. Prompt v5.
+
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
 1. Lê `supabase/seed/estabelecimentos_otcb_antigo.csv`, ignorando linhas sem nome.
@@ -397,4 +450,8 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Paleta (emenda do Alexandre, 08/11/2026) | O creme pastel e o âmbar principal da 16.2 saíram: fundo branco-frio `#F4F7FB`, azul `#1F4AA8` como cor principal (botões, bolhas do usuário, links), vermelho `#D22630` só como acento (a marca "OTCB"), âmbar só no chopp (copinho A1, Bolacha). As cores de status (16.2) continuam. Modo escuro em azul-marinho. | O app é só sobre chopp Brahma; o Alexandre pediu branco, azul e vermelho sem copiar a marca e sem o vermelho dominante. |
 | Fonte dos títulos (emenda do Alexandre, 08/11/2026) | Bebas Neue no lugar da Baloo 2 (16.3); o texto segue em Nunito. Os tamanhos de título subiram ~20%, porque a Bebas é condensada e só tem maiúsculas. | Combina com a paleta nova (cara de letreiro e de rótulo). |
 | Prompt do agente v3 e v4 (8.4) | "Chopp Brahma" no texto e nos títulos; o texto se sustenta sozinho e não fala de "card". | Pedido do Alexandre (só Brahma); a v3 gerou textos como "Mostrei o bar no card acima". |
+| Contador de edição de opinião (8.5) | Colunas `edicoes_dia` e `edicoes_qtd` em `otcb_opinioes`. | A 11.6 limita a 5 edições por dia, e a 7.2 não tem onde contar. |
+| `otcb_registrar_card` (8.5) | Função nova para a mensagem `sistema` do card. | O passo 3 da 8.5 manda o app gravar a mensagem `sistema`, mas a 6.1 só deixa o serviço inserir mensagens; a função grava texto fixo do servidor, sem texto livre do cliente. |
+| "Não sei" na sugestão (8.5) | Não cadastra o bar. | Decisão do Alexandre: o OTCB só lista onde tem chopp Brahma. |
+| Opinião × critério 7 (8.5) | Os cards gravam sem o agente. A opinião depende da moderação por IA (11.7) e, sem ela, não publica (15.9). | É a própria regra 11.7. |
 | Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |

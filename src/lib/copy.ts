@@ -80,6 +80,9 @@ export const copy = {
   },
   sheet: {
     // T6
+    giveOpinion: 'Dar opinião',
+    hasBrahma: 'Tem Brahma?',
+    report: 'Denunciar',
     route: 'Como chegar',
     uber: 'Chamar Uber',
     summary: 'O que a galera diz', // (proposto 8.4)
@@ -97,6 +100,49 @@ export const copy = {
     neighborhoods: (n: number) => (n === 1 ? '1 bairro conquistado' : `${n} bairros conquistados`), // (proposto 8.4)
     lastSeal: (s: string) => `Último selo: ${s}`, // (proposto 8.4)
     map: (n: number) => `Mapa com ${n} bares`, // (proposto 8.4) leitor de tela
+  },
+  // Cards de entrada (8.5): rótulos dos botões da tabela da 8.5; os demais "(proposto 8.5)"
+  cards: {
+    yes: 'Tem sim',
+    noMore: 'Não tem mais',
+    closed: 'Fechou',
+    shows: 'Passa',
+    doesntShow: 'Não passa',
+    askHasBrahma: (bar: string) => `O ${bar} ainda tem chopp Brahma?`, // (proposto 8.5) mesma do servidor
+    registered: 'Valeu! Tá registrado.', // (proposto 8.5)
+    // 15.8 — confirmação repetida no dia
+    alreadyToday: 'Você já contou isso hoje. Valeu!',
+    opinionTitle: (bar: string) => `Sua opinião sobre o ${bar}`, // (proposto 8.5)
+    opinionPlaceholder: 'Como tá o chopp Brahma, o colarinho, o atendimento?', // (proposto 8.5)
+    counter: (n: number) => `${n}/500`, // (proposto 8.5)
+    minChars: 'Mínimo de 10 caracteres.', // (proposto 8.5)
+    ratingLabel: 'Nota (opcional)', // (proposto 8.5)
+    star: (n: number) => (n === 1 ? '1 estrela' : `${n} estrelas`), // (proposto 8.5) leitor de tela
+    publish: 'Publicar', // (proposto 8.5)
+    published: 'Opinião publicada. Valeu!', // (proposto 8.5)
+    // 15.7
+    rejected: 'Não deu pra publicar essa opinião. Tenta reescrever sem ofensas nem dados pessoais.',
+    editLimit: 'Hoje você já mexeu nessa opinião 5 vezes. Amanhã dá pra editar de novo.', // (proposto 8.5)
+    suggestionTitle: 'Sugerir um bar com chopp Brahma', // (proposto 8.5)
+    barName: 'Nome do bar', // (proposto 8.5)
+    address: 'Endereço', // (proposto 8.5)
+    neighborhood: 'Bairro', // (proposto 8.5)
+    hereNow: 'Estou no bar agora', // (proposto 8.5)
+    hasBrahmaQuestion: 'Tem chopp Brahma?', // (proposto 8.5)
+    dontKnow: 'Não sei', // tabela da 8.5
+    suggest: 'Sugerir', // (proposto 8.5)
+    dontKnowNotice: 'Valeu! Aqui só entram bares com chopp Brahma. Se descobrir que tem, é só me contar.', // (proposto 8.5)
+    suggested: 'Bar sugerido! Ele entra como a confirmar.', // (proposto 8.5)
+    // 15.18
+    alreadyExisted: 'Esse bar já estava aqui — sua confirmação foi registrada.',
+    suggestionLimit: 'Por hoje já foram 5 sugestões. Amanhã tem mais.', // (proposto 8.5)
+    addressNotFound: 'Não achei esse endereço. Confere e tenta de novo.', // (proposto 8.5)
+    noLocation: 'Não consegui sua localização. Desmarca "Estou no bar agora" e escreve o endereço.', // (proposto 8.5)
+    reportTitle: 'Denunciar opinião', // (proposto 8.5)
+    reason: 'Motivo (opcional)', // (proposto 8.5)
+    reported: 'Denúncia enviada. Valeu por ajudar.', // (proposto 8.5)
+    alreadyReported: 'Você já denunciou essa opinião.', // (proposto 8.5)
+    cantReportOwn: 'Essa opinião é sua.', // (proposto 8.5)
   },
   // Nomes dos selos da regra 11.11 (proposto 8.4)
   seals: {

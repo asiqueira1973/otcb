@@ -7,8 +7,9 @@ import { Button } from '../../components/Button';
 import { fonts, useTheme } from '../../components/theme';
 import { copy } from '../../lib/copy';
 import { track } from '../../lib/telemetry';
-import type { CardBar } from '../chat/types';
-import { fetchBar, fetchOpinions, type Opiniao } from './api';
+import { minhaOpiniao } from '../cards/api';
+import type { BlocoEntrada, CardBar } from '../chat/types';
+import { apelidoProprio, fetchBar, fetchOpinions, type Opiniao } from './api';
 import { barTags } from './BarCard';
 import { formatDistance, formatScore, formatShortDate } from './format';
 import { openDirections } from './links';
@@ -24,7 +25,7 @@ export function useBarSheet(): SheetApi {
 
 // Provedor da Ficha (T6). Guarda o bar aberto e carrega os detalhes quando só o id é conhecido (mapa, ação).
 // Recebe: filhos. Devolve: filhos + o bottom sheet.
-export function BarSheetProvider({ children }: { children: ReactNode }) {
+export function BarSheetProvider({ children, onCard }: { children: ReactNode; onCard?: (b: BlocoEntrada) => void }) {
   const [bar, setBar] = useState<CardBar | null>(null);
   const [visible, setVisible] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -50,18 +51,25 @@ export function BarSheetProvider({ children }: { children: ReactNode }) {
   return (
     <SheetContext.Provider value={api}>
       {children}
-      <BarSheet visible={visible} bar={bar} failed={failed} onClose={() => setVisible(false)} />
+      <BarSheet
+        visible={visible}
+        bar={bar}
+        failed={failed}
+        onClose={() => setVisible(false)}
+        onCard={onCard ? (b) => { setVisible(false); onCard(b); } : undefined}
+      />
     </SheetContext.Provider>
   );
 }
 
-type Props = { visible: boolean; bar: CardBar | null; failed: boolean; onClose: () => void };
+type Props = { visible: boolean; bar: CardBar | null; failed: boolean; onClose: () => void; onCard?: (b: BlocoEntrada) => void };
 
 // Ficha do bar (T6) em bottom sheet que sobe com mola (A10, ~300 ms; com "reduzir movimento", só opacidade).
 // Mostra nome, bairro, endereço, status, etiquetas, nota do colarinho, última confirmação, resumo e opiniões
-// (15.16 quando vazio), com "Como chegar" e "Chamar Uber". Dar opinião / Tem Brahma? / Denunciar: épico 8.5.
+// (15.16 quando vazio), com "Como chegar" e "Chamar Uber". "Dar opinião" (já preenchido com a opinião atual,
+// critério 5), "Tem Brahma?" e "Denunciar" (menos na própria opinião) fecham a ficha e abrem o card no chat (8.5).
 // Recebe: visibilidade, bar, falha e fechar. Devolve: o modal.
-export function BarSheet({ visible, bar, failed, onClose }: Props) {
+export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
@@ -88,6 +96,15 @@ export function BarSheet({ visible, bar, failed, onClose }: Props) {
   }, [barId]);
 
   const opinions = loadedOpinions && loadedOpinions.barId === barId ? loadedOpinions.list : null;
+  const [meuApelido, setMeuApelido] = useState<string | null>(null);
+  useEffect(() => {
+    if (onCard && visible && meuApelido === null) void apelidoProprio().then(setMeuApelido);
+  }, [onCard, visible, meuApelido]);
+
+  async function darOpiniao(b: CardBar) {
+    const atual = await minhaOpiniao(b.bar_id).catch(() => null);
+    onCard?.({ tipo: 'formulario_opiniao', bar_id: b.bar_id, nome_bar: b.nome, texto_atual: atual?.texto ?? null, nota_atual: atual?.nota ?? null });
+  }
 
   const sheetStyle = useAnimatedStyle(() =>
     reduceMotion ? { opacity: progress.value } : { transform: [{ translateY: (1 - progress.value) * 600 }] },
@@ -132,6 +149,21 @@ export function BarSheet({ visible, bar, failed, onClose }: Props) {
                 <Button testID="ficha-uber" variant="ghost" label={copy.sheet.uber} onPress={() => void openDirections('uber', bar)} />
               </View>
             </View>
+            {onCard ? (
+              <View style={styles.actions}>
+                <View style={styles.action}>
+                  <Button testID="ficha-dar-opiniao" variant="ghost" label={copy.sheet.giveOpinion} onPress={() => void darOpiniao(bar)} />
+                </View>
+                <View style={styles.action}>
+                  <Button
+                    testID="ficha-tem-brahma"
+                    variant="ghost"
+                    label={copy.sheet.hasBrahma}
+                    onPress={() => onCard({ tipo: 'pergunta_confirmacao', bar_id: bar.bar_id, nome_bar: bar.nome, assunto: 'tem_brahma', pergunta: copy.cards.askHasBrahma(bar.nome) })}
+                  />
+                </View>
+              </View>
+            ) : null}
             {bar.resumo_opinioes ? (
               <>
                 <Text accessibilityRole="header" style={[styles.section, { color: theme.text }]}>{copy.sheet.summary}</Text>
@@ -150,6 +182,18 @@ export function BarSheet({ visible, bar, failed, onClose }: Props) {
                     {o.apelido}{o.nota !== null ? ` · ${'★'.repeat(o.nota)}` : ''} · {formatShortDate(o.criado_em)}
                   </Text>
                   <Text style={[styles.body, { color: theme.text }]}>{o.texto}</Text>
+                  {onCard && o.apelido !== meuApelido ? (
+                    <Pressable
+                      testID={`denunciar-${o.opiniao_id}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={copy.sheet.report}
+                      onPress={() => onCard({ tipo: 'formulario_denuncia', opiniao_id: o.opiniao_id })}
+                      hitSlop={10}
+                      style={styles.report}
+                    >
+                      <Text style={[styles.reportText, { color: theme.textMuted }]}>{copy.sheet.report}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ))
             )}
@@ -174,4 +218,6 @@ const styles = StyleSheet.create({
   action: { flex: 1 },
   opinion: { borderWidth: 1.5, borderRadius: 12, padding: 12, gap: 4 },
   opinionHead: { fontFamily: fonts.bodyBold, fontSize: 14 },
+  report: { alignSelf: 'flex-end', minHeight: 32, justifyContent: 'center' },
+  reportText: { fontFamily: fonts.bodyBold, fontSize: 13, textDecorationLine: 'underline' },
 });

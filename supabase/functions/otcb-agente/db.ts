@@ -65,5 +65,14 @@ export function createAgenteDb(admin: SupabaseClient, usuario: SupabaseClient): 
       return [...jogos.filter(doTime), ...jogos.filter((j) => !doTime(j))];
     },
     meuPassaporte: () => rpc(usuario, "otcb_meu_passaporte", {}),
+    // RLS otcb_opinioes_le_proprias: com o JWT da pessoa, só a própria opinião (de qualquer status) volta.
+    async minhaOpiniao(barId) {
+      const { data: u } = await usuario.auth.getUser();
+      if (!u.user) return null;
+      const { data, error } = await usuario.from("otcb_opinioes").select("texto, nota")
+        .eq("bar_id", barId).eq("usuario_id", u.user.id).maybeSingle();
+      if (error) throw new Error(`db_minha_opiniao: ${error.message}`);
+      return data;
+    },
   };
 }

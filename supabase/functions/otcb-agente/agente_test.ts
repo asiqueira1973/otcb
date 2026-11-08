@@ -4,6 +4,7 @@ import type Anthropic from "npm:@anthropic-ai/sdk@^0";
 
 import { montarBlocos, CacheTurno, paraCardBar } from "./blocos.ts";
 import { MAX_RODADAS, type ModeloAgente } from "./agente.ts";
+import { FERRAMENTAS } from "./ferramentas.ts";
 import { verificarGuardrail } from "./guardrails.ts";
 import { handleAgente, LIMITE_DIARIO, validarEntrada } from "./handler.ts";
 import { TEXTOS } from "./textos.ts";
@@ -35,6 +36,7 @@ function fakeDb(opts: { hoje?: number; bares?: Record<string, unknown>[] } = {})
     opinioesDoBar: () => Promise.resolve([]),
     jogos: () => Promise.resolve([]),
     meuPassaporte: () => Promise.resolve({ carimbos: [], colecoes_bairro: [], selos: [] }),
+    minhaOpiniao: () => Promise.resolve(null),
   };
   return { db, estado };
 }
@@ -351,4 +353,56 @@ Deno.test("P1: 'você sabe se o bar vende chopp Brahma?' não é compra; 'você(
   for (const compra of ["vocês vendem chopp?", "vc vende barril?", "voces entregam?", "o app entrega chopp em casa?"]) {
     assertEquals(verificarGuardrail(compra)?.tipo, "compra", compra);
   }
+});
+
+// ===================================================================== cards de entrada (8.5)
+
+Deno.test("8.5: oferecer_card monta pergunta_confirmacao com pergunta do servidor e só para bar do turno", async () => {
+  const { db } = fakeDb({ bares: [BAR("b1", "incerto")] });
+  const { modelo } = fakeModelo([
+    usoFerramenta("t1", "buscar_bares", { texto: "Bar b1" }),
+    { stop_reason: "tool_use", content: [
+      { type: "text", text: "Confirma pra mim?", citations: null } as Anthropic.TextBlock,
+      { type: "tool_use", id: "t2", name: "oferecer_card", input: { tipo: "pergunta_confirmacao", bar_id: "b1", assunto: "tem_brahma" } } as Anthropic.ToolUseBlock,
+      { type: "tool_use", id: "t3", name: "oferecer_card", input: { tipo: "pergunta_confirmacao", bar_id: "inventado", assunto: "tem_brahma" } } as Anthropic.ToolUseBlock,
+    ] },
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "o Bar b1 tem Brahma" }), deps(db, modelo))).json();
+  assertEquals(corpo.blocos, [{ tipo: "pergunta_confirmacao", bar_id: "b1", nome_bar: "Bar b1", assunto: "tem_brahma", pergunta: "O Bar b1 ainda tem chopp Brahma?" }]);
+});
+
+Deno.test("critério 5: formulario_opiniao vem preenchido com a opinião atual da pessoa", async () => {
+  const { db } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  db.minhaOpiniao = () => Promise.resolve({ texto: "Minha opinião antiga", nota: 4 });
+  const { modelo } = fakeModelo([
+    usoFerramenta("t1", "detalhes_bar", { bar_id: "b1" }),
+    usoFerramenta("t2", "oferecer_card", { tipo: "formulario_opiniao", bar_id: "b1" }),
+    textoFinal("Só editar."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "quero mudar minha opinião do Bar b1" }), deps(db, modelo))).json();
+  assertEquals(corpo.blocos[0], { tipo: "formulario_opiniao", bar_id: "b1", nome_bar: "Bar b1", texto_atual: "Minha opinião antiga", nota_atual: 4 });
+});
+
+Deno.test("8.5: denúncia só de opinião vista no turno; sugestão corta campos longos", async () => {
+  const { db } = fakeDb({ bares: [BAR("b1", "confirmado")] });
+  db.opinioesDoBar = () => Promise.resolve([{ opiniao_id: "op9", apelido: "x", nota: null, texto: "t", criado_em: "2026-11-08T00:00:00Z" }]);
+  const { modelo } = fakeModelo([
+    usoFerramenta("t1", "opinioes_do_bar", { bar_id: "b1" }),
+    { stop_reason: "tool_use", content: [
+      { type: "tool_use", id: "t2", name: "oferecer_card", input: { tipo: "formulario_denuncia", opiniao_id: "op9" } } as Anthropic.ToolUseBlock,
+      { type: "tool_use", id: "t3", name: "oferecer_card", input: { tipo: "formulario_denuncia", opiniao_id: "op-inventada" } } as Anthropic.ToolUseBlock,
+      { type: "tool_use", id: "t4", name: "oferecer_card", input: { tipo: "formulario_sugestao_bar", nome: "N".repeat(200), bairro: "Moema" } } as Anthropic.ToolUseBlock,
+    ] },
+    textoFinal("Pronto pra você."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "denunciar" }), deps(db, modelo))).json();
+  assertEquals(corpo.blocos.map((b: { tipo: string }) => b.tipo), ["formulario_denuncia", "formulario_sugestao_bar"]);
+  assertEquals(corpo.blocos[1].nome.length, 120);
+  assertEquals(corpo.blocos[1].endereco, null);
+  assertEquals(corpo.blocos[1].usar_localizacao_atual, false);
+});
+
+Deno.test("8.5: o agente não tem ferramenta que grava", () => {
+  const nomes = FERRAMENTAS.map((f) => f.name);
+  assertEquals(nomes.sort(), ["buscar_bares", "detalhes_bar", "jogos_de_hoje", "meu_passaporte", "mostrar", "oferecer_card", "opinioes_do_bar"]);
 });

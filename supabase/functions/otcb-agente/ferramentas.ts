@@ -1,6 +1,7 @@
 import type Anthropic from "npm:@anthropic-ai/sdk@^0";
 
 import { CacheTurno, montarBlocos, paraCardBar } from "./blocos.ts";
+import { TEXTOS } from "./textos.ts";
 import type { AgenteDb, Bloco, CardBar } from "./tipos.ts";
 
 // Ferramentas do agente (seção 13.3). Nenhuma grava dado do usuário (o agente não escreve no banco; 8.5).
@@ -44,6 +45,24 @@ export const FERRAMENTAS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: {} },
   },
   {
+    name: "oferecer_card",
+    description: "Oferece um card para a pessoa preencher e gravar ela mesma (você não grava nada). Tipos: pergunta_confirmacao (bar_id e assunto: tem_brahma | transmite_jogos | funcionamento) para perguntar se o bar ainda tem chopp Brahma, passa jogo ou fechou; formulario_opiniao (bar_id) quando a pessoa quer opinar; formulario_sugestao_bar (nome, endereco, bairro, usar_localizacao_atual=true se ela disse que está no bar) quando ela conhece um bar com chopp Brahma que não está na base; formulario_denuncia (opiniao_id vindo de opinioes_do_bar) quando quer denunciar uma opinião. Use bar_id que veio de buscar_bares ou detalhes_bar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tipo: { type: "string", enum: ["pergunta_confirmacao", "formulario_opiniao", "formulario_sugestao_bar", "formulario_denuncia"] },
+        bar_id: { type: "string" },
+        assunto: { type: "string", enum: ["tem_brahma", "transmite_jogos", "funcionamento"] },
+        opiniao_id: { type: "string" },
+        nome: { type: "string" },
+        endereco: { type: "string" },
+        bairro: { type: "string" },
+        usar_localizacao_atual: { type: "boolean" },
+      },
+      required: ["tipo"],
+    },
+  },
+  {
     name: "mostrar",
     description: "Mostra cards na resposta. Use os ids que vieram das outras ferramentas. Tipos: lista_bares (titulo, bar_ids), card_bar (bar_id), mapa (bar_ids), jogos (jogo_ids), passaporte, acao (acao: abrir_rota | chamar_uber | abrir_ficha | abrir_camera | abrir_passaporte; bar_id quando for de um bar; rotulo curto).",
     input_schema: {
@@ -82,6 +101,41 @@ function paraModelo(b: CardBar) {
   };
 }
 
+const corta = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+
+// Monta um bloco de entrada da 13.2 (8.5). Só aceita bar e opinião vistos no turno (o modelo não inventa
+// alvo); a pergunta é do servidor; a opinião atual da pessoa vem do banco (critério 5).
+// Recebe: pedido do modelo, banco e turno. Devolve: o bloco ou null se inválido.
+export async function montarCardEntrada(p: Record<string, unknown>, db: AgenteDb, turno: Turno): Promise<Bloco | null> {
+  switch (p.tipo) {
+    case "pergunta_confirmacao": {
+      const bar = turno.cache.bares.get(String(p.bar_id));
+      const assunto = p.assunto as "tem_brahma" | "transmite_jogos" | "funcionamento";
+      const perguntas = { tem_brahma: TEXTOS.perguntaTemBrahma, transmite_jogos: TEXTOS.perguntaJogos, funcionamento: TEXTOS.perguntaFuncionamento };
+      if (!bar || !(assunto in perguntas)) return null;
+      return { tipo: "pergunta_confirmacao", bar_id: bar.bar_id, nome_bar: bar.nome, assunto, pergunta: perguntas[assunto](bar.nome) };
+    }
+    case "formulario_opiniao": {
+      const bar = turno.cache.bares.get(String(p.bar_id));
+      if (!bar) return null;
+      const atual = await db.minhaOpiniao(bar.bar_id).catch(() => null);
+      return { tipo: "formulario_opiniao", bar_id: bar.bar_id, nome_bar: bar.nome, texto_atual: atual?.texto ?? null, nota_atual: atual?.nota ?? null };
+    }
+    case "formulario_sugestao_bar":
+      return {
+        tipo: "formulario_sugestao_bar",
+        nome: corta(p.nome, 120), endereco: corta(p.endereco, 200), bairro: corta(p.bairro, 80),
+        usar_localizacao_atual: p.usar_localizacao_atual === true,
+      };
+    case "formulario_denuncia": {
+      const id = String(p.opiniao_id);
+      return turno.cache.opinioes.has(id) ? { tipo: "formulario_denuncia", opiniao_id: id } : null;
+    }
+    default:
+      return null;
+  }
+}
+
 export type Turno = { cache: CacheTurno; blocos: Bloco[]; local: { latitude: number; longitude: number } | null };
 
 // Executa uma ferramenta. Recebe: nome, entrada, banco e turno. Devolve: o conteúdo (JSON) para o modelo.
@@ -116,8 +170,10 @@ export async function executarFerramenta(nome: string, entrada: Record<string, u
         return JSON.stringify({ bar: paraModelo(bar) });
       }
       case "opinioes_do_bar": {
-        const ops = await db.opinioesDoBar(String(entrada.bar_id), Number(entrada.pagina ?? 0));
-        return JSON.stringify({ opinioes: ops.map(({ apelido, nota, texto, criado_em }) => ({ apelido, nota, texto, criado_em })) });
+        const barId = String(entrada.bar_id);
+        const ops = await db.opinioesDoBar(barId, Number(entrada.pagina ?? 0));
+        for (const o of ops) turno.cache.opinioes.set(o.opiniao_id, barId);
+        return JSON.stringify({ opinioes: ops.map(({ opiniao_id, apelido, nota, texto, criado_em }) => ({ opiniao_id, apelido, nota, texto, criado_em })) });
       }
       case "jogos_de_hoje": {
         const dias = Math.min(Math.max(Number(entrada.dias_a_frente ?? 0), 0), 7);
@@ -132,6 +188,12 @@ export async function executarFerramenta(nome: string, entrada: Record<string, u
         const selos = Array.isArray(p.selos) ? p.selos.filter((s: { conquistado?: boolean }) => s.conquistado) : [];
         turno.cache.passaporte = { total_carimbos: carimbos, bairros_conquistados: bairros, ultimo_selo: selos.length ? String(selos.at(-1).selo) : null };
         return JSON.stringify(turno.cache.passaporte);
+      }
+      case "oferecer_card": {
+        const bloco = await montarCardEntrada(entrada, db, turno);
+        if (!bloco) return JSON.stringify({ erro: "card_invalido", instrucao: "Use um bar_id ou opiniao_id que veio das ferramentas neste turno." });
+        turno.blocos.push(bloco);
+        return JSON.stringify({ oferecido: bloco.tipo });
       }
       case "mostrar": {
         const { blocos, descartados } = montarBlocos(entrada.blocos, turno.cache);

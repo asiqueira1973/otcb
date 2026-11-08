@@ -17,7 +17,7 @@ import { copy } from '../src/lib/copy';
 // Passaporte (8.7) e Perfil. Recebe: nada. Devolve: a tela.
 export default function Chat() {
   const theme = useTheme();
-  const { messages, typing, loaded, send, retry, reload } = useChat();
+  const { messages, typing, loaded, send, retry, reload, addLocalCard } = useChat();
   const [text, setText] = useState('');
   const list = useRef<FlatList>(null);
   // Mensagens que já estavam na tela ao carregar não animam; só as novas entram com A2.
@@ -43,7 +43,7 @@ export default function Chat() {
   const empty = loaded && messages.length === 0;
 
   return (
-    <BarSheetProvider>
+    <BarSheetProvider onCard={addLocalCard}>
       <SafeAreaView style={[styles.root, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Text accessibilityRole="header" style={[styles.brand, { color: theme.accent }]}>{copy.brand}</Text>

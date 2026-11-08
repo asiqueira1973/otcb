@@ -18,3 +18,14 @@ export async function fetchOpinions(barId: string, pagina = 0): Promise<Opiniao[
   if (error) throw new Error(error.message);
   return (data ?? []) as Opiniao[];
 }
+
+// Apelido da própria pessoa (RLS: só o próprio perfil), para não oferecer "Denunciar" na própria opinião.
+// Devolve: o apelido ou '' se não achar.
+export async function apelidoProprio(): Promise<string> {
+  try {
+    const { data } = await supabase.from('otcb_perfis').select('apelido').limit(1).maybeSingle();
+    return data?.apelido ?? '';
+  } catch {
+    return '';
+  }
+}

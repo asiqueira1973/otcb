@@ -2,7 +2,7 @@ import Anthropic from "npm:@anthropic-ai/sdk@^0";
 
 import { CacheTurno } from "./blocos.ts";
 import { executarFerramenta, FERRAMENTAS, type Turno } from "./ferramentas.ts";
-import { PROMPT_AGENTE_V4 } from "./prompts/agente.v4.ts";
+import { PROMPT_AGENTE_V5 } from "./prompts/agente.v5.ts";
 import type { AgenteDb, Bloco } from "./tipos.ts";
 
 // Loop do agente do chat (seções 4.1, 13.1 e 13.3). Modelo da seção 4.1: claude-sonnet-5-5.
@@ -77,7 +77,7 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
   const messages = montarMensagens(entrada);
   // O prompt fixo e as ferramentas ficam em cache (prefixo estável); o contexto do turno vem depois.
   const system: Anthropic.TextBlockParam[] = [
-    { type: "text", text: PROMPT_AGENTE_V4, cache_control: { type: "ephemeral" } },
+    { type: "text", text: PROMPT_AGENTE_V5, cache_control: { type: "ephemeral" } },
     { type: "text", text: contextoDoTurno(entrada) },
   ];
   const textos: string[] = [];
@@ -117,10 +117,10 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
       const conteudo = await executarFerramenta(uso.name, (uso.input ?? {}) as Record<string, unknown>, db, turno);
       resultados.push({ type: "tool_result", tool_use_id: uso.id, content: conteudo });
     }
-    // Critério 8 (p95 < 8 s): "mostrar" só ecoa; se a rodada já trouxe o texto e só mostrou cards, a
+    // Critério 8 (p95 < 8 s): "mostrar" e "oferecer_card" só ecoam; se a rodada já trouxe o texto e só mostrou cards, a
     // resposta está pronta e não há outra chamada ao modelo (o prompt v2 pede o texto junto com o mostrar).
     // Sem texto, segue mais uma rodada para o modelo escrever.
-    if (texto && usos.every((u) => u.name === "mostrar")) break;
+    if (texto && usos.every((u) => u.name === "mostrar" || u.name === "oferecer_card")) break;
     messages.push({ role: "user", content: resultados });
   }
 

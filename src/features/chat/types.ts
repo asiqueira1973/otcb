@@ -26,8 +26,18 @@ export type Jogo = { jogo_id: string; competicao: string; mandante: string; visi
 
 export type AcaoTipo = 'abrir_camera' | 'abrir_rota' | 'chamar_uber' | 'abrir_ficha' | 'abrir_passaporte';
 
-// Blocos de exibição do 8.4; os de entrada (pergunta_confirmacao, formulários, resultado_colarinho) chegam no 8.5/8.6.
+export type Assunto = 'tem_brahma' | 'transmite_jogos' | 'funcionamento';
+
+// Blocos de entrada (8.5): a pessoa preenche e grava no próprio card, sem o modelo.
+export type BlocoEntrada =
+  | { tipo: 'pergunta_confirmacao'; bar_id: string; nome_bar: string; assunto: Assunto; pergunta: string }
+  | { tipo: 'formulario_opiniao'; bar_id: string; nome_bar: string; texto_atual: string | null; nota_atual: number | null }
+  | { tipo: 'formulario_sugestao_bar'; nome: string | null; endereco: string | null; bairro: string | null; usar_localizacao_atual: boolean }
+  | { tipo: 'formulario_denuncia'; opiniao_id: string };
+
+// Blocos de exibição (8.4) e de entrada (8.5); resultado_colarinho chega no 8.6.
 export type Bloco =
+  | BlocoEntrada
   | { tipo: 'lista_bares'; titulo: string; bares: CardBar[] }
   | { tipo: 'card_bar'; bar: CardBar }
   | { tipo: 'mapa'; pontos: Pick<CardBar, 'bar_id' | 'nome' | 'latitude' | 'longitude' | 'status'>[] }

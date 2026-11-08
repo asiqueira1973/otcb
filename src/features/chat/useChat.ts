@@ -4,7 +4,7 @@ import { copy } from '../../lib/copy';
 import { getCurrentCoords } from '../../lib/location';
 import { track } from '../../lib/telemetry';
 import { loadHistory, sendToAgent } from './api';
-import type { Bloco, ChatMessage } from './types';
+import type { Bloco, BlocoEntrada, ChatMessage } from './types';
 
 let localSeq = 0;
 const localId = (p: string) => `${p}-${Date.now()}-${++localSeq}`;
@@ -104,5 +104,11 @@ export function useChat() {
     [deliver],
   );
 
-  return { messages, typing, loaded, send, retry, reload };
+  // Card aberto pela Ficha (T6: "Dar opinião", "Tem Brahma?", "Denunciar"): entra no chat como fala
+  // local do app, sem chamar o agente (8.5). Recebe: o bloco de entrada.
+  const addLocalCard = useCallback((bloco: BlocoEntrada) => {
+    setMessages((all) => [...all, { id: localId('card'), papel: 'assistente', conteudo: '', blocos: [bloco], criado_em: new Date().toISOString() }]);
+  }, []);
+
+  return { messages, typing, loaded, send, retry, reload, addLocalCard };
 }
