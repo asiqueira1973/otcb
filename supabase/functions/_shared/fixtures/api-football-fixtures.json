@@ -1,0 +1,209 @@
+{
+ "get": "fixtures",
+ "errors": [],
+ "results": 7,
+ "response": [
+  {
+   "fixture": {
+    "id": 1638198,
+    "date": "2026-11-08T17:00:00-03:00",
+    "timestamp": 1794168000,
+    "status": {
+     "long": "First Half",
+     "short": "1H",
+     "elapsed": 11,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 73,
+    "name": "Copa Do Brasil",
+    "country": "Brazil",
+    "season": 2026
+   },
+   "teams": {
+    "home": {
+     "id": 133,
+     "name": "Vasco DA Gama"
+    },
+    "away": {
+     "id": 121,
+     "name": "Palmeiras"
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1520960,
+    "date": "2026-11-08T16:00:00-03:00",
+    "timestamp": 1794164400,
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 54,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 72,
+    "name": "Serie B",
+    "country": "Brazil",
+    "season": 2026
+   },
+   "teams": {
+    "home": {
+     "id": 13975,
+     "name": "Athletic Club"
+    },
+    "away": {
+     "id": 144,
+     "name": "Atletico Goianiense"
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1648412,
+    "date": "2026-11-08T21:15:00-03:00",
+    "timestamp": 1794183300,
+    "status": {
+     "long": "Not Started",
+     "short": "NS",
+     "elapsed": null,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 1086,
+    "name": "Paulista - U20",
+    "country": "Brazil",
+    "season": 2026
+   },
+   "teams": {
+    "home": {
+     "id": 12998,
+     "name": "Corinthians U20"
+    },
+    "away": {
+     "id": 18345,
+     "name": "RB Bragantino U20"
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1637992,
+    "date": "2026-11-08T04:30:00-03:00",
+    "timestamp": 1794123000,
+    "status": {
+     "long": "Match Finished",
+     "short": "FT",
+     "elapsed": 90,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 1012,
+    "name": "AFC U17 Asian Cup",
+    "country": "World",
+    "season": 2027
+   },
+   "teams": {
+    "home": {
+     "id": 25299,
+     "name": "Guam U17"
+    },
+    "away": {
+     "id": 25314,
+     "name": "Singapore U17"
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 999001,
+    "date": "2026-11-08T16:00:00-03:00",
+    "timestamp": 1794164400,
+    "status": {
+     "long": "Match Postponed",
+     "short": "PST",
+     "elapsed": null
+    }
+   },
+   "league": {
+    "id": 72,
+    "name": "Serie B",
+    "country": "Brazil",
+    "season": 2026
+   },
+   "teams": {
+    "home": {
+     "id": 13975,
+     "name": "Athletic Club"
+    },
+    "away": {
+     "id": 144,
+     "name": "Atletico Goianiense"
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 999002,
+    "date": "2026-11-08T16:00:00-03:00",
+    "timestamp": 1794164400,
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 54,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 10,
+    "name": "Friendlies",
+    "country": "World",
+    "season": 2026
+   },
+   "teams": {
+    "home": {
+     "id": 13975,
+     "name": "Brazil"
+    },
+    "away": {
+     "id": 144,
+     "name": "Japan"
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 999003,
+    "date": "2026-11-08T16:00:00-03:00",
+    "timestamp": 1794164400,
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 54,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 10,
+    "name": "Friendlies",
+    "country": "World",
+    "season": 2026
+   },
+   "teams": {
+    "home": {
+     "id": 13975,
+     "name": "Peru"
+    },
+    "away": {
+     "id": 144,
+     "name": "Chile"
+    }
+   }
+  }
+ ]
+}
