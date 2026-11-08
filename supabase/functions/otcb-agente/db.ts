@@ -49,7 +49,8 @@ export function createAgenteDb(admin: SupabaseClient, usuario: SupabaseClient): 
     // jogos_de_hoje (13.3; seção 9 jogos): do início de hoje (SP) até o fim do dia hoje + dias; jogos do
     // time pedido primeiro (time do coração quando o modelo passa), depois por horário.
     // Com time, lê a janela inteira antes de filtrar (verifier do 8.9: o limite de 50 escondia o jogo do time
-    // num dia cheio); a tabela só guarda 7 dias (13.9), então o teto de 2000 nunca corta na prática.
+    // num dia cheio). O PostgREST corta em max_rows = 1000 (config.toml); a tabela só guarda 7 dias (13.9,
+    // ~40 jogos), então o corte nunca acontece na prática.
     async jogos(time, dias) {
       const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
       const inicio = new Date(`${hojeSp}T00:00:00-03:00`);

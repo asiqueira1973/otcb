@@ -528,7 +528,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - critério 3: no Itaim, nenhum bar que passa jogo, com 3 cards "Passa jogo?".
 
   Os dados de teste foram limpos.
-- **Avaliação:** 20/20, com p95 de 8,2 s (o prompt cresceu; tempo aceito sem rigor pelo Alexandre).
+- **Avaliação:** 20/20 com o prompt v6 (p95 8,2 s) e de novo com o v7 (p50 5,9 s, p95 11,4 s em Wi-Fi). O prompt cresceu; o tempo foi aceito sem rigor pelo Alexandre.
 
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.

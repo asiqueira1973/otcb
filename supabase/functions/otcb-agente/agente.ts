@@ -134,7 +134,7 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
   let texto = (textos.join("\n\n") || (turno.blocos.length === 0 ? rascunhos.at(-1) ?? "" : "")).trim();
   // Regra 12.5: com os jogos desatualizados, a resposta sempre avisa (o servidor garante se o modelo esquecer).
   if (turno.jogosDesatualizados && !/n[ãa]o consegui atualizar/i.test(texto)) {
-    texto = texto ? `${texto}\n\n${TEXTOS.jogosDesatualizados}` : TEXTOS.jogosDesatualizados;
+    texto = `${texto || TEXTOS.soCards}\n\n${TEXTOS.jogosDesatualizados}`;
   }
   if (!texto && turno.blocos.length === 0) throw new IaIndisponivel("resposta_vazia");
   return { texto, blocos: turno.blocos, uso };
