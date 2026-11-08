@@ -418,3 +418,6 @@ enabled = true
 # otcb-garimpo se autentica pelo cabeçalho x-otcb-cron (seção 13.6); o pg_net não envia JWT.
 [functions.otcb-garimpo]
 verify_jwt = false
+
+[functions.otcb-jogos]
+verify_jwt = false
