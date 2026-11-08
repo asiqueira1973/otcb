@@ -50,5 +50,8 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - `tsconfig.json` exclui `supabase/functions` (Deno tem `supabase/functions/deno.json` próprio).
 - Testes de banco nunca contam a tabela inteira: filtre pelos dados da fixture.
 - Hooks de `.claude/settings.json` só valem em sessão do Claude Code aberta nesta pasta.
+- Agente: `npm run agente:avaliar` gasta ~20 chamadas ao Sonnet; o p95 está perto do teto de 8 s, então meça de novo depois de mexer no prompt ou no loop. Prompt novo = arquivo `agente.vN+1.ts`.
+- Textos do app dizem "chopp Brahma", nunca "chopp" genérico (emenda 8.4); a loja segue sem Brahma.
+- Helpers de teste ficam em `test-utils/` (o jest roda tudo dentro de `__tests__/`); render com `renderWithSafeArea`.
 - Quando o agente errar a mesma coisa duas vezes, a correção entra aqui.
 - Submissão à Apple (8.11): as notas de revisão e a descrição precisam explicar o app inteiro (agente de IA no chat, Colarinhômetro, Passaporte, confirmação colaborativa, localização) — nunca "lista de bares". O Alexandre já foi reprovado (guideline 4.2) com "poderia ser um site".

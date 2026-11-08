@@ -10,6 +10,9 @@ jest.mock('react-native-reanimated', () => {
     useSharedValue: (value: number) => ({ value }),
     useAnimatedStyle: (factory: () => object) => factory(),
     withTiming: (value: number) => value,
+    withSpring: (value: number) => value,
+    withDelay: (_delay: number, value: number) => value,
+    withRepeat: (value: number) => value,
     useReducedMotion: () => false,
   };
 });
@@ -32,3 +35,11 @@ jest.mock('expo-secure-store', () => {
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+
+// react-native-maps depende de módulo nativo: nos testes, mapa e marcadores viram Views com os mesmos props.
+jest.mock('react-native-maps', () => {
+  const { View } = require('react-native');
+  const MapView = (props: object) => require('react').createElement(View, { ...props, testID: 'map-view' });
+  const Marker = (props: { title?: string }) => require('react').createElement(View, { ...props, accessibilityLabel: props.title });
+  return { __esModule: true, default: MapView, Marker };
+});

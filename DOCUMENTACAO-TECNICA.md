@@ -31,6 +31,7 @@ Extensões usadas, liberadas pelo Alexandre: `pg_trgm`, `unaccent` e `pg_net` (n
 - `papel`.
 - `maioridade_confirmada_em`: o instante da declaração de 18+. A data de nascimento **não é gravada**.
 - `time_do_coracao`: opcional.
+- `revisao_menor_em` (8.4): quando o guardrail da 11.18 detectou menção a idade abaixo de 18 no chat. Só o serviço grava, o cliente não lê (grant por coluna) e o admin consulta pelo Studio.
 - `criado_em` e `atualizado_em`.
 
 **`otcb_bares`**: cada bar conhecido.
@@ -133,6 +134,7 @@ Todas exigem `authenticated` e nunca aceitam `anon`.
 | `otcb_buscar_bares` | lat/lng, raio, texto, bairro, filtros → até 8 `CardBar` | Invoker (11.9). Só aparece bar não excluído, com status confirmado, provavel ou incerto e pontuação ≥ 0,1. Raio de 2 km por padrão, até 10 km. Ordena por status e depois por distância. Sem localização, exige texto ou bairro (`localizacao_ou_bairro_obrigatorio`). |
 | `otcb_agregados_confirmacao` | bar → última confirmação e pessoas distintas em 60 dias | Definer; devolve só números, sem dizer quem confirmou. Cada positiva anônima conta como uma pessoa (depois da anonimização resta no máximo uma por pessoa e bar). |
 | `otcb_detalhes_bar` | bar → `CardBar` | Definer; erro `bar_inexistente`. |
+| `otcb_opinioes_do_bar` (8.4) | bar, página → até 10 `{opiniao_id, apelido, nota, texto, criado_em}` | Definer; só opiniões `publicada` de bar não excluído, mais recentes primeiro. Expõe o apelido (seção 20) e nunca o id do autor. Usada pela Ficha e pelo agente. |
 | `otcb_meu_passaporte` | — → `{carimbos, colecoes_bairro, colecao_classicos, selos}` | Definer, sempre filtrado por `auth.uid()` (11.11). Os selos são Primeira tirada, Explorador (5, 15 e 30), Andarilho, Olho clínico e Informante. |
 
 ### Políticas (6.1)
@@ -172,6 +174,16 @@ Todas valem só para `authenticated` e usam `auth.uid()`.
 | `otcb_configurar_garimpo(url, segredo)` | Grava a URL e o segredo no Vault. Chamada por `npm run garimpo:configurar`. |
 | `otcb_garimpo_disparar(modo, execucao?)` | `net.http_post` para `otcb-garimpo` com o cabeçalho `x-otcb-cron`. Usada pelos jobs e pelo reagendamento entre lotes. |
 
+### Funções do chat (épico 8.4; service-only)
+
+| Nome | O que faz |
+|---|---|
+| `otcb_mensagens_hoje(usuario)` | Conta as mensagens `usuario` do dia de São Paulo (11.6). |
+| `otcb_contexto_chat(usuario)` | As últimas 20 mensagens das últimas 6 h, inclusive `sistema`, em ordem cronológica (11.13). |
+| `otcb_marcar_revisao_menor(usuario)` | Preenche `revisao_menor_em` (11.18), sem sobrescrever a primeira marca. |
+
+O cliente passou a ler `otcb_perfis` por coluna (todas menos `revisao_menor_em`).
+
 ### Jobs do `pg_cron` (horários em UTC; São Paulo é UTC−3)
 
 | Job | Quando | Chama |
@@ -195,7 +207,9 @@ O `otcb_cron_jogos` entra no épico 8.9.
 | T3 Apelido e time | `app/(onboarding)/apelido.tsx` | — | `insert` em `otcb_perfis` |
 | T4 Localização | `app/(onboarding)/localizacao.tsx` | — | Permissão de localização do sistema |
 | T10 Bloqueio | `app/(onboarding)/bloqueio.tsx` | — | — |
-| T5 Chat (provisório) | `app/chat.tsx` | — | — (épico 8.4) |
+| T5 Chat | `app/chat.tsx` + `src/features/chat/` | `otcb_mensagens` (histórico próprio) | Edge Function `otcb-agente` |
+| T6 Ficha do bar | `src/features/bares/BarSheet.tsx` | `otcb_detalhes_bar`, `otcb_opinioes_do_bar` | Links de rota e Uber (13.2) |
+| T9 Perfil (mínimo) | `app/perfil.tsx` | — | `delete` em `otcb_mensagens` (próprias) |
 
 ## 5. Lógica por tela, Edge Function e script
 
@@ -283,6 +297,50 @@ O `otcb_cron_jogos` entra no épico 8.9.
 
 Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 classificações.
 
+### T5 Chat (`useChat`, épico 8.4)
+- Ao abrir e a cada volta à tela, carrega o histórico próprio (`usuario` e `assistente`, até 300). Sem rede, mantém o que já está na tela.
+- **Envio:**
+  - pega a localização só se a permissão de primeiro plano já existe (última posição conhecida de até 2 min, senão GPS com teto de 4 s), sem pedir de novo;
+  - chama `otcb-agente` com o JWT;
+  - mostra o A1 enquanto espera.
+- **Erros:**
+  - sem rede: a mensagem fica "Não enviada · Sem sinal por aqui…" com "Tentar de novo";
+  - 503 ou outra falha: "Não enviada · Deu um branco…" com "Tentar de novo";
+  - 429: resposta local com a copy 15.8.
+- Chat vazio mostra as sugestões da 15.4. Câmera e Passaporte avisam "em breve" até o 8.6 e o 8.7.
+- **Blocos (13.2):**
+  - `lista_bares` e `card_bar`: comanda com pílulas ("confirmado", "provável", "a confirmar") e etiquetas, distância e colarinho;
+  - `mapa`: `react-native-maps` estático, pinos na cor do status;
+  - `jogos` e `passaporte`;
+  - `acao`: rota, Uber e ficha usam as coordenadas dos bares da mesma resposta.
+- Tocar no card abre a Ficha (A10).
+- **Telemetria (Visão de Produto, 25.2):**
+  - lote a cada 3 s, com `x-api-key` e `distinct_id` = uid anônimo;
+  - só as propriedades da tabela da seção 21;
+  - nunca envia texto nem localização, e falha de rede não lança.
+
+### Edge Function `otcb-agente` (13.1; épico 8.4)
+- **Entrada:** POST com JWT do usuário e `{mensagem 1–1000, latitude?, longitude?}`, as duas coordenadas juntas ou nenhuma.
+- **Saída:** `{mensagem_id, texto, blocos, bloqueada_guardrail}`.
+- **Erros:** 401, 422, 429 `limite_mensagens` (com `texto` 15.8) e 503 `ia_indisponivel` (com `texto` 15.9). No 503 nada é gravado.
+- **Ordem:**
+  1. **Guardrail 11.18** (`guardrails.ts`): regex sem acento, na ordem menor → dirigir → quantidade → compra. Responde o texto fixo da 15.11 e não chama o modelo. O log leva só `{evento:'guardrail', tipo}`; "menor" também marca `revisao_menor_em`.
+  2. **Limite, contexto e perfil**, consultados em paralelo. Com 40 mensagens no dia → 429.
+  3. **Modelo** `claude-sonnet-5-5`, com esforço `low`:
+     - o prompt fixo `prompts/agente.v2.ts` e as ferramentas ficam em cache; o contexto do turno (apelido, time, localização e hora de SP) vem num bloco de sistema separado;
+     - no máximo 5 rodadas de ferramenta; a 6ª chamada usa `tool_choice: none`;
+     - se a rodada traz texto e só chama `mostrar`, o turno termina ali (critério 8).
+- **Ferramentas (13.3):**
+  - `buscar_bares`, `detalhes_bar` e `meu_passaporte` rodam com o JWT do usuário; `opinioes_do_bar` e `jogos_de_hoje` também.
+  - Sem texto e sem bairro, `buscar_bares` usa a localização do turno; sem localização, devolve `sem_localizacao` para o modelo pedir o bairro.
+  - Status fora de confirmado/provavel/incerto são descartados antes de chegar ao modelo, e `incerto` chega como `a_confirmar`.
+- **`mostrar`:** recebe ids. O servidor monta o `CardBar` a partir do cache do turno e descarta bloco inválido ou com bar inventado.
+- **Grava** a mensagem do usuário e a resposta (com blocos) com instantes crescentes. A localização nunca é gravada.
+- **Log:** `{evento:'resposta', ms, blocos, chamadas, cache_lido, cache_gravado, entrada}`, só números.
+- **Avaliação:**
+  - `avaliacao.json` tem 20 perguntas com o esperado de cada uma, e `npm run agente:avaliar [-- --repetir N]` roda contra o BANCO DE TESTE com um usuário descartável;
+  - resultado em 08/11/2026: 40/40, p50 5,4 s, p95 7,3 s (Wi-Fi, 34 respostas do modelo).
+
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
 1. Lê `supabase/seed/estabelecimentos_otcb_antigo.csv`, ignorando linhas sem nome.
@@ -326,4 +384,12 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Descoberta cria bar só com evidência positiva de Brahma (8.3) | — | Evita encher a base de bares sem relação com o produto. |
 | Uma página com vários bares (8.3) | A classificação 13.6 devolve um único `nome_bar`; listas tipo "10 bares com Brahma" geram evidência para um bar só. | Limitação do contrato 13.6. |
 | `otcb-garimpo` com `verify_jwt = false` (8.3) | A autenticação é o segredo `x-otcb-cron`. | O `pg_net` não manda JWT; a 13.6 define o segredo próprio. |
-| **Pendente para o 8.4/8.8** | O apelido dos outros usuários nas opiniões é público (seção 20), mas o RLS de perfis só deixa ver o próprio. | Vai precisar de uma função ou view nesses épicos. |
+| Apelido nas opiniões (resolvido no 8.4) | Função `otcb_opinioes_do_bar` (definer), aprovada pelo Alexandre. | O RLS de perfis só deixa ver o próprio; a seção 20 quer o apelido público. |
+| `otcb_perfis.revisao_menor_em` (8.4) | Coluna nova. | A 11.18 manda sinalizar a conta para revisão, e a 7.2 não tem onde guardar. |
+| `bloqueada_guardrail` na resposta do agente (8.4) | Campo a mais na saída da 13.1. | A propriedade `bloqueada_guardrail` do evento `otcb_resposta_recebida` (seção 21) precisa vir do servidor. |
+| `texto` nos erros 429/503 do agente (8.4) | Campo a mais no corpo de erro. | O app mostra a copy da seção 15 mesmo sem mapear o código. |
+| `mostrar` recebe ids (8.4) | O spec diz "blocos de exibição"; o servidor monta os cards a partir do cache do turno. | Garante que o modelo não invente bar nem status (critério 3; 11.18 "não inventar"). |
+| Encerrar no `mostrar` com texto e prompt v2 (8.4) | Otimização do loop da 13.1. | O p95 estava em 8,7 s; o critério 8 pede menos de 8 s. O `claude-sonnet-5-5` recusa thinking desligado. |
+| "Chopp Brahma" nos textos (8.4) | 15.1 "Onde tem chopp Brahma bem tirado?", 15.3 "Pra achar o chopp Brahma mais perto…", 15.4 "Chopp Brahma perto de mim", 15.13 "Pergunta onde tem chopp Brahma…". | Emenda do Alexandre: o app é só sobre chopp Brahma. A loja (15.10) continua sem a palavra. |
+| Perfil mínimo e "em breve" (8.4) | T9 só com "Limpar conversa", aviso 15.20 e rodapé 15.12; câmera e Passaporte mostram "em breve". | O resto entra no 8.10, 8.6 e 8.7. |
+| Mascote A9 | Bolacha ao lado das respostas e triste na mensagem não enviada; sem Lottie nem piscar. | As ilustrações são PNG; o piscar entra quando houver Lottie (16.7 deixa a animação livre). |

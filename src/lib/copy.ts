@@ -5,8 +5,8 @@ export const copy = {
   // 15.10: nome do produto (sem a marca de cerveja)
   brand: 'OTCB',
   welcome: {
-    // 15.1
-    title: 'Onde tem chopp bem tirado?',
+    // 15.1, com a emenda "só Brahma" do Alexandre (8.4)
+    title: 'Onde tem chopp Brahma bem tirado?',
     subtitle: 'Pergunta pra gente. A gente garimpa os bares de SP pra você.',
     footer: 'Proibido para menores de 18 anos.',
     // 15.19
@@ -34,9 +34,9 @@ export const copy = {
     submit: 'Bora',
   },
   location: {
-    // 15.3
+    // 15.3, com a emenda "só Brahma" (8.4)
     explain:
-      'Pra achar o chopp mais perto, a gente usa sua localização só na hora da pergunta ou da foto. Não guardamos por onde você anda.',
+      'Pra achar o chopp Brahma mais perto, a gente usa sua localização só na hora da pergunta ou da foto. Não guardamos por onde você anda.',
     allow: 'Permitir', // (design)
     notNow: 'Agora não', // (design)
   },
@@ -48,7 +48,75 @@ export const copy = {
     retry: 'Tentar de novo', // (design)
   },
   chat: {
-    // 15.13
-    inputPlaceholder: 'Pergunta onde tem chopp…',
+    // 15.13, com a emenda "só Brahma" (8.4)
+    inputPlaceholder: 'Pergunta onde tem chopp Brahma…',
+    // 15.4, com a emenda do Alexandre (8.4): "Chopp Brahma perto de mim"
+    suggestions: ['Chopp Brahma perto de mim', 'Onde ver o jogo hoje?', 'Bar com balcão em Pinheiros', 'Meu Passaporte'],
+    // 15.8
+    limit: 'Por hoje deu de conversa. Amanhã tem mais.',
+    send: 'Enviar', // (proposto 8.4)
+    camera: 'Colarinhômetro', // (proposto 8.4) rótulo do botão da câmera
+    typing: 'Pensando na resposta…', // (proposto 8.4) leitor de tela do A1
+    notSent: 'Não enviada', // (proposto 8.4)
+    passport: 'Passaporte', // (proposto 8.4) atalho
+    profile: 'Perfil', // (proposto 8.4) atalho
+    comingSoonTitle: 'Chega já já', // (proposto 8.4)
+    comingSoon: 'Essa parte ainda está no forno. Por enquanto, pergunta aqui no chat.', // (proposto 8.4)
+  },
+  bar: {
+    // 16.4: pílulas de status e etiquetas
+    status: { confirmado: 'confirmado', provavel: 'provável', incerto: 'a confirmar' },
+    counter: 'balcão',
+    games: 'passa jogo',
+    classic: 'clássico',
+    distanceM: (m: number) => `a ${m} m`, // (proposto 8.4)
+    distanceKm: (km: string) => `a ${km} km`, // (proposto 8.4)
+    collar: (n: string) => `Colarinho ${n}`, // (proposto 8.4)
+    noCollar: 'Colarinho sem nota ainda', // (proposto 8.4)
+    opinions: (n: number) => (n === 1 ? '1 opinião' : `${n} opiniões`), // (proposto 8.4)
+    lastConfirmation: (d: string) => `Última confirmação em ${d}`, // (proposto 8.4)
+    noConfirmation: 'Ainda sem confirmação de quem foi lá', // (proposto 8.4)
+    open: (nome: string) => `Abrir a ficha do ${nome}`, // (proposto 8.4) leitor de tela
+  },
+  sheet: {
+    // T6
+    route: 'Como chegar',
+    uber: 'Chamar Uber',
+    summary: 'O que a galera diz', // (proposto 8.4)
+    opinions: 'Opiniões', // (proposto 8.4)
+    // 15.16
+    noOpinions: 'Ninguém opinou ainda. Seja o primeiro.',
+    close: 'Fechar', // (proposto 8.4)
+    loadError: 'Não deu pra abrir a ficha agora.', // (proposto 8.4)
+  },
+  blocks: {
+    games: 'Jogos', // (proposto 8.4)
+    noGames: 'Nenhum jogo na lista por enquanto.', // (proposto 8.4)
+    passport: 'Seu Passaporte', // (proposto 8.4)
+    stamps: (n: number) => (n === 1 ? '1 carimbo' : `${n} carimbos`), // (proposto 8.4)
+    neighborhoods: (n: number) => (n === 1 ? '1 bairro conquistado' : `${n} bairros conquistados`), // (proposto 8.4)
+    lastSeal: (s: string) => `Último selo: ${s}`, // (proposto 8.4)
+    map: (n: number) => `Mapa com ${n} bares`, // (proposto 8.4) leitor de tela
+  },
+  // Nomes dos selos da regra 11.11 (proposto 8.4)
+  seals: {
+    primeira_tirada: 'Primeira tirada',
+    explorador: 'Explorador',
+    andarilho: 'Andarilho',
+    olho_clinico: 'Olho clínico',
+    informante: 'Informante',
+  } as Record<string, string>,
+  profile: {
+    title: 'Perfil', // (proposto 8.4)
+    back: 'Voltar', // (proposto 8.4)
+    clearChat: 'Limpar conversa', // T9
+    clearConfirm: 'Isso apaga as mensagens do chat. Não dá pra desfazer.', // (proposto 8.4)
+    clearAction: 'Limpar', // (proposto 8.4)
+    cancel: 'Cancelar', // (proposto 8.4)
+    cleared: 'Conversa limpa.', // (proposto 8.4)
+    // 15.20
+    passportNotice: 'Seu passaporte fica neste celular. Se reinstalar o app ou trocar de aparelho, ele não volta.',
+    // 15.12
+    footer: 'Beba com moderação. Se beber, não dirija.',
   },
 } as const;
