@@ -54,5 +54,6 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - Textos do app dizem "chopp Brahma", nunca "chopp" genérico (emenda 8.4); a loja segue sem Brahma.
 - Helpers de teste ficam em `test-utils/` (o jest roda tudo dentro de `__tests__/`); render com `renderWithSafeArea`.
 - Teste real de card no remoto: apagar a conta anonimiza as evidências, que continuam valendo no status. Apague as `confirmacao_usuario`/`sugestao_usuario` do teste e rode `otcb_recalcular_bar`.
+- `claude-haiku-5-5` raciocina antes de responder: `max_tokens` pequeno (200–400) termina no raciocínio, sem JSON (`stop_reason: max_tokens`). Use ≥ 2048 e `effort: "low"`; corte de texto sempre no fim de palavra.
 - Quando o agente errar a mesma coisa duas vezes, a correção entra aqui.
 - Submissão à Apple (8.11): as notas de revisão e a descrição precisam explicar o app inteiro (agente de IA no chat, Colarinhômetro, Passaporte, confirmação colaborativa, localização) — nunca "lista de bares". O Alexandre já foi reprovado (guideline 4.2) com "poderia ser um site".

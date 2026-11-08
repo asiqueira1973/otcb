@@ -92,7 +92,7 @@ export function criarVisao(apiKey: string, criar?: CriarMensagem): Visao {
         try {
           resposta = await chamar({
             model: MODELO_VISAO,
-            max_tokens: 300,
+            max_tokens: 2048, // espaço para o raciocínio do modelo (bug real do 8.8)
             system: SISTEMA,
             messages: [{
               role: "user",
@@ -101,7 +101,7 @@ export function criarVisao(apiKey: string, criar?: CriarMensagem): Visao {
                 { type: "text", text: "Avalie esta foto." },
               ],
             }],
-            output_config: { format: { type: "json_schema", schema: SCHEMA } },
+            output_config: { format: { type: "json_schema", schema: SCHEMA }, effort: "low" },
           } as Anthropic.MessageCreateParamsNonStreaming);
         } catch (error) {
           const status = error instanceof Anthropic.APIError ? error.status ?? 0 : 0;

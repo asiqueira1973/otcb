@@ -54,6 +54,18 @@ const SISTEMA_RESUMO = `Você resume opiniões de clientes sobre um bar para o a
 Escreva em português do Brasil, em até 400 caracteres, um resumo neutro do que as opiniões dizem (chopp, colarinho, atendimento, ambiente).
 Não cite nomes nem apelidos de quem opinou. Não invente nada que não esteja nas opiniões. Responda só com o texto do resumo.`;
 
+// Corta o resumo em até 400 caracteres (11.8) no fim de uma frase, ou de uma palavra com reticências (bug real
+// do 8.8: o corte caía no meio da palavra). Recebe: texto. Devolve: texto ≤ 400.
+export function cortarResumo(texto: string): string {
+  const t = texto.trim().replace(/\s+/g, " ");
+  if (t.length <= 400) return t;
+  const ate = t.slice(0, 400);
+  const fimFrase = Math.max(ate.lastIndexOf(". "), ate.lastIndexOf("! "), ate.lastIndexOf("? "));
+  if (fimFrase > 200) return ate.slice(0, fimFrase + 1);
+  const espaco = t.slice(0, 399).lastIndexOf(" ");
+  return `${t.slice(0, espaco > 200 ? espaco : 399).replace(/[\s,;:–-]+$/, "")}…`;
+}
+
 // Valida a saída contra o contrato 13.6. Recebe: o JSON parseado. Devolve: a classificação ou null.
 export function validarClassificacao(v: unknown): Classificacao | null {
   if (!v || typeof v !== "object") return null;
@@ -102,10 +114,10 @@ export function createClaudeClient(apiKey: string, criar?: CriarMensagem): Claud
         try {
           response = await client.messages.create({
             model: MODELO_CLASSIFICACAO,
-            max_tokens: 1024,
+            max_tokens: 2048, // espaço para o raciocínio do modelo (bug real do 8.8)
             system: SISTEMA_CLASSIFICACAO,
             messages: [{ role: "user", content: `Contexto: ${contexto}\n\nTexto:\n${texto.slice(0, 20000)}` }],
-            output_config: { format: { type: "json_schema", schema: SCHEMA_CLASSIFICACAO } },
+            output_config: { format: { type: "json_schema", schema: SCHEMA_CLASSIFICACAO }, effort: "low" },
           } as Anthropic.MessageCreateParamsNonStreaming);
         } catch (error) {
           traduzirErro(error);
@@ -124,13 +136,13 @@ export function createClaudeClient(apiKey: string, criar?: CriarMensagem): Claud
       try {
         const response = await client.messages.create({
           model: MODELO_CLASSIFICACAO,
-          max_tokens: 400,
+          max_tokens: 2048, // espaço para o raciocínio; o texto é cortado em 400 abaixo (bug real do 8.8)
           system: SISTEMA_RESUMO,
           messages: [{ role: "user", content: `Opiniões:\n${lista}` }],
         });
         const texto = textoDe(response);
         if (!texto || response.stop_reason === "refusal") throw new ExternalServiceError("claude", 0, false, "resumo_vazio");
-        return texto.slice(0, 400);
+        return cortarResumo(texto);
       } catch (error) {
         if (error instanceof ExternalServiceError) throw error;
         traduzirErro(error);

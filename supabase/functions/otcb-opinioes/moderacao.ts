@@ -58,11 +58,12 @@ export function criarModerador(apiKey: string, criar?: CriarMensagem): Moderador
         try {
           resposta = await chamar({
             model: MODELO_MODERACAO,
-            max_tokens: 200,
+            // O claude-haiku-5-5 raciocina antes de responder; 200 tokens acabavam no raciocínio (bug real do 8.8).
+            max_tokens: 2048,
             system: SISTEMA,
             // "</opiniao>" dentro do texto não fecha a etiqueta (problema 3 do verifier).
             messages: [{ role: "user", content: `<opiniao>${texto.replaceAll("</opiniao>", "</ opiniao>")}</opiniao>` }],
-            output_config: { format: { type: "json_schema", schema: SCHEMA } },
+            output_config: { format: { type: "json_schema", schema: SCHEMA }, effort: "low" },
           } as Anthropic.MessageCreateParamsNonStreaming);
         } catch (error) {
           const status = error instanceof Anthropic.APIError ? error.status ?? 0 : 0;
