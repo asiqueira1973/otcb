@@ -578,3 +578,30 @@ Deno.test("bug do 8.11: jogos_de_hoje informa a cobertura (sem Copa do Brasil ne
   const resultado = JSON.parse((chamadas[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].content as string);
   assert(/Brasileirão/.test(resultado.cobertura) && /Copa do Brasil/.test(resultado.cobertura) && /estaduais/.test(resultado.cobertura), resultado.cobertura);
 });
+
+// Bug real do 8.11 (2ª parte): mesmo com a cobertura no resultado e o prompt v9, o modelo respondeu "Hoje o
+// Vasco não joga, Alexandre." O servidor reescreve a afirmação e garante o aviso de cobertura.
+Deno.test("bug do 8.11: sem jogo hoje na base, a resposta não afirma que o time não joga", async () => {
+  const { db } = fakeDb();
+  db.jogos = () => Promise.resolve([
+    { jogo_id: "j1", competicao: "Brasileirão", mandante: "Chapecoense", visitante: "Vasco da Gama", inicio: new Date(Date.now() + 6 * 86_400_000).toISOString() },
+  ]);
+  const { modelo } = fakeModelo([
+    usoFerramenta("t1", "jogos_de_hoje", { time: "Vasco", dias_a_frente: 7 }),
+    textoFinal("Hoje o Vasco não joga, Alexandre. O próximo jogo é Chapecoense x Vasco, sábado (14/11) às 20h30."),
+  ]);
+  const corpo = await (await handleAgente(req({ mensagem: "o vasco joga hoje?" }), deps(db, modelo))).json();
+  assertFalse(/não joga/i.test(corpo.texto), corpo.texto);
+  assert(/Copa do Brasil/.test(corpo.texto), corpo.texto);
+  assert(/O próximo jogo é Chapecoense x Vasco/.test(corpo.texto), corpo.texto);
+});
+
+Deno.test("bug do 8.11: com jogo do time hoje, nada é reescrito", async () => {
+  const { db } = fakeDb();
+  db.jogos = () => Promise.resolve([
+    { jogo_id: "j1", competicao: "Brasileirão", mandante: "Vasco da Gama", visitante: "Bahia", inicio: new Date(Date.now() + 60_000).toISOString() },
+  ]);
+  const { modelo } = fakeModelo([usoFerramenta("t1", "jogos_de_hoje", { time: "Vasco" }), textoFinal("Tem Vasco hoje.")]);
+  const corpo = await (await handleAgente(req({ mensagem: "o vasco joga hoje?" }), deps(db, modelo))).json();
+  assertEquals(corpo.texto, "Tem Vasco hoje.");
+});
