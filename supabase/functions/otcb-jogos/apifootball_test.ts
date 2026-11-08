@@ -60,3 +60,26 @@ Deno.test("API-Football: carga sem nenhum jogo é registrada como falha e manté
   assertFalse(gravou);
   assertEquals(registros, ["falhou"]);
 });
+
+// Bug real da troca (08/11/2026): o plano grátis só libera ontem, hoje e amanhã; do 3º dia em diante a API devolve
+// errors.plan e a carga inteira falhava. Agora fica com os dias que vieram e para no primeiro "plan".
+Deno.test("API-Football: dias além do plano param a busca sem perder os anteriores", async () => {
+  const { buscarJanela } = await import("./apifootball.ts");
+  const pedidos: string[] = [];
+  const r = await buscarJanela(["2026-11-08", "2026-11-09", "2026-11-10", "2026-11-11"], (dia) => {
+    pedidos.push(dia);
+    return Promise.resolve(dia <= "2026-11-09"
+      ? { status: 200, corpo: { errors: [], response: [] } }
+      : { status: 200, corpo: { errors: { plan: "Free plans do not have access to this date" }, response: [] } });
+  });
+  assertEquals(r.status, 200);
+  assertEquals((r.corpo as unknown[]).length, 2);
+  assertEquals(pedidos, ["2026-11-08", "2026-11-09", "2026-11-10"]);
+});
+
+Deno.test("API-Football: erro já no primeiro dia (chave, limite) falha a carga", async () => {
+  const { buscarJanela } = await import("./apifootball.ts");
+  const r = await buscarJanela(["2026-11-08", "2026-11-09"], () =>
+    Promise.resolve({ status: 200, corpo: { errors: { token: "Missing application key" }, response: [] } }));
+  assertEquals(r.status, 502);
+});
