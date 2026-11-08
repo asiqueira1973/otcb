@@ -16,7 +16,7 @@ export const TEXTOS = {
   perguntaJogos: (bar: string) => `O ${bar} passa jogo?`,
   perguntaFuncionamento: (bar: string) => `O ${bar} fechou?`,
   // (proposto 8.9) regra 12.5: football-data fora; os jogos mostrados são os da última atualização.
-  // (proposto 8.11) a base de jogos só cobre parte das competições (premissa P2, assunção 24.9).
-  coberturaJogos: "Aqui eu só acompanho o Brasileirão Série A e as ligas europeias; Copa do Brasil e estaduais ainda não aparecem.",
+  // (proposto 8.11) a base de jogos não cobre tudo (API-Football, lista de competições da otcb-jogos).
+  coberturaJogos: "Aqui eu acompanho Brasileirão A e B, Copa do Brasil, Libertadores, Sul-Americana, os principais estaduais, a Seleção e as grandes ligas europeias; Série C, base e feminino ainda não aparecem.",
   jogosDesatualizados: "Não consegui atualizar os jogos hoje, então essa lista pode estar desatualizada.",
 } as const;

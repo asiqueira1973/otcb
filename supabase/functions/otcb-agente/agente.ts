@@ -2,7 +2,7 @@ import Anthropic from "npm:@anthropic-ai/sdk@^0";
 
 import { CacheTurno } from "./blocos.ts";
 import { executarFerramenta, FERRAMENTAS, type Turno } from "./ferramentas.ts";
-import { PROMPT_AGENTE_V9 } from "./prompts/agente.v9.ts";
+import { PROMPT_AGENTE_V10 } from "./prompts/agente.v10.ts";
 import { TEXTOS } from "./textos.ts";
 import type { AgenteDb, Bloco } from "./tipos.ts";
 
@@ -72,7 +72,7 @@ export function contextoDoTurno(entrada: EntradaAgente): string {
 }
 
 // Reescreve "Hoje o Vasco não joga" e variações para "não achei jogo do Vasco hoje nas competições que eu
-// acompanho" e acrescenta TEXTOS.coberturaJogos se a resposta ainda não fala da Copa do Brasil.
+// acompanho" e acrescenta TEXTOS.coberturaJogos se a resposta ainda não diz o que fica de fora.
 // Recebe: texto da resposta. Devolve: texto ajustado.
 export function semAfirmarQueNaoJoga(texto: string): string {
   const troca = (_m: string, art: string, nome: string) => `não achei jogo d${art.toLowerCase()} ${nome.trim()} hoje nas competições que eu acompanho`;
@@ -80,7 +80,7 @@ export function semAfirmarQueNaoJoga(texto: string): string {
     .replace(/\bhoje,?\s+(o|a)\s+([^.,!?\n]+?)\s+não\s+(?:joga|tem\s+jogo|entra\s+em\s+campo)\b/gi, troca)
     .replace(/\b(o|a)\s+([^.,!?\n]+?)\s+não\s+(?:joga|tem\s+jogo|entra\s+em\s+campo)\s+hoje\b/gi, troca);
   t = t.replace(/(^|[.!?]\s+)não achei jogo/g, (_m, antes: string) => `${antes}Não achei jogo`);
-  if (!/Copa do Brasil/i.test(t)) t = `${t}\n\n${TEXTOS.coberturaJogos}`;
+  if (!t.includes(TEXTOS.coberturaJogos) && !/Série C/i.test(t)) t = `${t}\n\n${TEXTOS.coberturaJogos}`;
   return t;
 }
 
@@ -91,7 +91,7 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
   const messages = montarMensagens(entrada);
   // O prompt fixo e as ferramentas ficam em cache (prefixo estável); o contexto do turno vem depois.
   const system: Anthropic.TextBlockParam[] = [
-    { type: "text", text: PROMPT_AGENTE_V9, cache_control: { type: "ephemeral" } },
+    { type: "text", text: PROMPT_AGENTE_V10, cache_control: { type: "ephemeral" } },
     { type: "text", text: contextoDoTurno(entrada) },
   ];
   const textos: string[] = [];

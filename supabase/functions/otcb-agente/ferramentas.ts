@@ -140,9 +140,9 @@ export async function montarCardEntrada(p: Record<string, unknown>, db: AgenteDb
 // timeSemJogoHoje (bug do 8.11): o time pedido não tem jogo hoje na base, o que não quer dizer que ele não joga.
 export type Turno = { cache: CacheTurno; blocos: Bloco[]; local: { latitude: number; longitude: number } | null; jogosDesatualizados?: boolean; timeSemJogoHoje?: string };
 
-// Competições que a otcb-jogos traz (plano grátis do football-data.org, premissa P2 e assunção 24.9).
+// Competições que a otcb-jogos traz (API-Football, emenda do 8.11; lista em otcb-jogos/apifootball.ts LIGAS).
 export const COBERTURA_JOGOS =
-  "Brasileirão Série A e as principais ligas europeias e a Champions League. Não inclui Copa do Brasil, Libertadores, Série B nem estaduais.";
+  "Brasileirão Série A e B, Copa do Brasil, Libertadores, Sul-Americana, Copa do Nordeste, os principais estaduais (Paulistão, Carioca, Mineiro, Gaúcho, Paranaense, Catarinense, Baiano, Pernambucano, Cearense, Goiano), jogos da Seleção, Champions League e as principais ligas europeias. Não inclui Série C e D, divisões inferiores dos estaduais, base nem futebol feminino.";
 
 // Dia em São Paulo (AAAA-MM-DD) de um instante ISO. Recebe: instante. Devolve: data.
 function diaSp(iso: string): string {

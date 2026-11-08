@@ -573,12 +573,13 @@ Deno.test("bug do 8.11: jogos_de_hoje entrega o horário em São Paulo (inicio_s
 // Bug real do 8.11: o Vasco jogava hoje fora do Brasileirão e o agente afirmou "Hoje o Vasco não joga". A base
 // só tem as competições do plano grátis do football-data; a ferramenta diz isso ao modelo para ele não
 // afirmar ausência de jogo.
-Deno.test("bug do 8.11: jogos_de_hoje informa a cobertura (sem Copa do Brasil nem estaduais)", async () => {
+Deno.test("bug do 8.11: jogos_de_hoje informa a cobertura", async () => {
   const { db } = fakeDb();
   const { modelo, chamadas } = fakeModelo([usoFerramenta("t1", "jogos_de_hoje", { time: "Vasco" }), textoFinal("Não achei.")]);
   await handleAgente(req({ mensagem: "o Vasco joga hoje?" }), deps(db, modelo));
   const resultado = JSON.parse((chamadas[1].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].content as string);
-  assert(/Brasileirão/.test(resultado.cobertura) && /Copa do Brasil/.test(resultado.cobertura) && /estaduais/.test(resultado.cobertura), resultado.cobertura);
+  // Emenda do 8.11 (API-Football): Copa do Brasil e estaduais passam a ser cobertos; o que fica de fora é Série C, base e feminino.
+  assert(/Copa do Brasil/.test(resultado.cobertura) && /Paulistão/.test(resultado.cobertura) && /Não inclui Série C/.test(resultado.cobertura), resultado.cobertura);
 });
 
 // Bug real do 8.11 (2ª parte): mesmo com a cobertura no resultado e o prompt v9, o modelo respondeu "Hoje o
@@ -594,7 +595,7 @@ Deno.test("bug do 8.11: sem jogo hoje na base, a resposta não afirma que o time
   ]);
   const corpo = await (await handleAgente(req({ mensagem: "o vasco joga hoje?" }), deps(db, modelo))).json();
   assertFalse(/não joga/i.test(corpo.texto), corpo.texto);
-  assert(/Copa do Brasil/.test(corpo.texto), corpo.texto);
+  assert(corpo.texto.includes(TEXTOS.coberturaJogos), corpo.texto);
   assert(/O próximo jogo é Chapecoense x Vasco/.test(corpo.texto), corpo.texto);
 });
 

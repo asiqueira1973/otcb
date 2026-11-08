@@ -60,3 +60,4 @@ App Expo SDK 58 + Expo Router (`app/`, `src/features/*`) → só chave publicáv
 - Cache local novo com dado da pessoa (AsyncStorage ou arquivo) entra em `clearLocalData` (`src/features/profile/deleteMyData.ts`), senão "Apagar meus dados" deixa resto no aparelho.
 - Deploy de Edge Function no CLI pede `--yes` em modo agente (o Alexandre deixou autorizado para as `otcb-*`).
 - Metro do OTCB: `npx expo start --port 8091` (a 8081 é de outro projeto); o atalho "Perfil" do Chat fica sob a engrenagem do Expo no simulador; use o deep link `exp://127.0.0.1:8091/--/perfil`.
+- Jogos vêm da API-Football (`API_FOOTBALL_KEY`): o plano grátis só libera ontem, hoje e amanhã (`errors.plan` no corpo com HTTP 200); a API sempre responde 200 e o erro vem em `errors`. Ids gravados com prefixo `af:`.

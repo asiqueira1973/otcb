@@ -4,8 +4,10 @@ import { janela, type JogoNovo, mapearPartidas } from "./jogos.ts";
 
 export type DepsJogos = {
   segredoCron: string;
-  // GET /v4/matches no football-data. Devolve: status e JSON.
+  // Busca os jogos da janela na fonte (API-Football desde a emenda do 8.11). Devolve: status e JSON.
   buscar: (de: string, ate: string) => Promise<{ status: number; corpo: unknown }>;
+  // Converte a resposta da fonte em jogos (padrão: o mapeamento do football-data, mantido para os testes de 8.9).
+  mapear?: (corpo: unknown) => { jogos: JogoNovo[]; cancelados: string[] };
   gravar: (dados: { jogos: JogoNovo[]; cancelados: string[] }) => Promise<{ gravados: number; apagados: number }>;
   agora: () => Date;
   log: (e: Record<string, unknown>) => void;
@@ -39,7 +41,13 @@ export async function handleJogos(req: Request, deps: DepsJogos): Promise<Respon
     await registrar("falhou", { football_data: r.status });
     return json(502, { codigo: "football_data_indisponivel" });
   }
-  const dados = mapearPartidas(r.corpo);
+  const dados = (deps.mapear ?? mapearPartidas)(r.corpo);
+  // Emenda do 8.11: carga sem nenhum jogo é tratada como falha (chave vencida, fonte fora) e mantém os gravados.
+  if (dados.jogos.length === 0) {
+    deps.log({ evento: "sem_jogos", cancelados: dados.cancelados.length });
+    await registrar("falhou", { sem_jogos: true });
+    return json(502, { codigo: "sem_jogos" });
+  }
   let res: { gravados: number; apagados: number };
   try {
     res = await deps.gravar(dados);
