@@ -58,6 +58,13 @@ supabase secrets set --project-ref jeesdmfcrmhyufwzwzwt NOME=valor
 - [ ] Localização negada: o app chega ao Chat e o agente pede o bairro.
 - [ ] Localização usada só no momento da pergunta ou da foto, nunca em segundo plano.
 
+## Publicação (épico 8.11)
+- Conta Expo `alexsiq`, projeto `@alexsiq/otcb`; bundle e pacote `com.dablab.otcb`; só iPhone.
+- Variáveis `EXPO_PUBLIC_*` ficam nos ambientes `production` e `preview` do EAS (`eas env:list`).
+- Build: `npx eas-cli build --platform ios --profile production` (o primeiro precisa do login da Apple, interativo) e `--platform android`.
+- Envio iOS: `npx eas-cli submit --platform ios --profile production --id <build>` (chave da API em `secrets/AuthKey_STNQW83D6N.p8`, fora do git). Android: baixar o `.aab` e subir no Play Console.
+- Fichas e imagens: `store/` (textos pelo skill `app-store-dablab`; prints por `store/screenshots/compose.py` e `compose_play.py`).
+
 ## Guardrails do Claude Code
 
 Ficam em `.claude/settings.json`, `.claude/hooks/`, `.claude/agents/verifier.md` e `REVIEW.md` (spec, Anexo B). Durante a correção de um bug, crie `.claude/fix-mode` para impedir edição de testes e remova o arquivo ao terminar.

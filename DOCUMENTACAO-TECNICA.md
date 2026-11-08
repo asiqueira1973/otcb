@@ -556,6 +556,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 
   Os dados de teste foram limpos.
 - **Avaliação:** 20/20 com o prompt v6 (p95 8,2 s) e de novo com o v7 (p50 5,9 s, p95 11,4 s em Wi-Fi). O prompt cresceu; o tempo foi aceito sem rigor pelo Alexandre.
+- **Horário dos jogos em São Paulo (bug do 8.11, prompt v8):** com o horário em UTC, o modelo escrevia a conta de fuso ("23:30 UTC = 20:30 em SP.") e isso virava a resposta. Agora `jogos_de_hoje` entrega `inicio_sp` ("sáb 14/11 20:30", função `horarioSp` em `ferramentas.ts`) e o prompt v8 proíbe conta de fuso; o card `jogos` continua com o `inicio` UTC do cache.
 
 ### Script `scripts/import-seed.ts` (14.1)
 - Roda com `npm run seed:import`, usando `.env` e `.env.local`. Usa o service role e nunca imprime chaves.
@@ -579,13 +580,15 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - permissões só de câmera e localização em uso; o Android bloqueia microfone e localização em segundo plano;
   - splash pelo plugin `expo-splash-screen` (no SDK 58 não fica mais na raiz do config);
   - projeto EAS `@alexsiq/otcb`.
-- **`eas.json`:** perfis `development`, `preview` e `production` (`autoIncrement`), versão local. O envio iOS usa a chave da API do App Store Connect da Dab Lab em `secrets/` (fora do git). O Android sai para teste interno, como rascunho.
+- **`eas.json`:** perfis `development`, `preview` e `production` (`autoIncrement`) e um perfil `screenshots` (build de simulador para os prints); a numeração de build fica no EAS (`appVersionSource: remote`, porque o `autoIncrement` não funciona com `app.config.ts` e numeração local). O envio iOS usa a chave da API do App Store Connect da Dab Lab em `secrets/` (fora do git). O Android sai para teste interno, como rascunho.
 - **Ícone e splash:** a bolacha sobre o azul `#1F4AA8` (ícone) e sobre `#F4F7FB` (splash), sem texto e sem copo.
 - **Fichas das lojas** em `store/`, geradas com o skill `app-store-dablab`:
   - Support URL do Carrd e política no documento da Dab Lab no Notion, com uma seção do OTCB;
   - questionário de privacidade com localização efêmera, fotos, conteúdo do usuário, ID anônimo e uso;
   - notas de revisão que explicam o app inteiro;
   - classificação esperada 18+.
+- **Prints das lojas:** capturas reais do app (build de simulador, iPhone 17 Pro Max) montadas por `store/screenshots/compose.py` (App Store 1320×2868 e 1206×2622) e `compose_play.py` (Play: ícone 512, destaque 1024×500, prints 1080×1920). Para as telas não ficarem vazias, foram criados dados de vitrine temporários (3 usuários de teste com opiniões, fotos e confirmações; carimbos no perfil do simulador) e **apagados** depois das capturas, com recálculo dos bares (08/11/2026).
+- **Curadoria dos 33 bares do CSV:** `scripts/curadoria-bares-csv.sql` (idempotente) grava a evidência `curadoria`; aplicado no remoto em 08/11/2026.
 - **Marca fora da loja:** o teste `__tests__/store-brand.test.ts` falha se "brahma" aparecer em `store/`, `app.config.ts` ou `eas.json`. Ele reforça o hook `guard-store-brand.sh`, que só age quando o Claude Code roda a partir da pasta do OTCB.
 
 ## 6. Divergências em relação ao spec
@@ -604,7 +607,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | `otcb_detalhes_bar` | Devolve o status real (pode ser `sem_brahma` ou `fechado`). | A assinatura não traz contexto; o agente só mostra os visíveis da 11.9. |
 | Fechamento pelo Google | Interpretação literal: um `status_google` fechado só é anulado por foto ou confirmação positiva de usuário mais recente. | O spec não trata o Google voltar a dizer OPERATIONAL; ponto registrado no plano 8.2. |
 | CHECK `otcb_fotos_caminho_do_dono` | Restrição a mais. | Garante a pasta `{usuario_id}/` exigida pela 7.2 e pela política de storage. |
-| Advisors de `otcb_` (rodados depois das 9 migrations, em 08/11/2026) | Avisos aceitos, nenhum ERROR. As políticas padrão do `pg_cron` (`cron.job`, `cron.job_run_details`) também aparecem no aviso de acesso anônimo; elas vêm da extensão, filtram por `username = current_user`, e o schema `cron` não é exposto na API. Os demais avisos: RPCs `security definer` executáveis por `authenticated` (a 13.4 exige), políticas acessíveis ao usuário anônimo (a identidade do app é anônima), políticas permissivas múltiplas (nomes da 6.1) e índices ainda sem uso. | Todos vêm do próprio spec. |
+| Advisors de `otcb_` (rodados depois de cada migration, a última a da curadoria, 20261108001600, em 08/11/2026; 9 avisos de segurança, os mesmos de antes) | Avisos aceitos, nenhum ERROR. As políticas padrão do `pg_cron` (`cron.job`, `cron.job_run_details`) também aparecem no aviso de acesso anônimo; elas vêm da extensão, filtram por `username = current_user`, e o schema `cron` não é exposto na API. Os demais avisos: RPCs `security definer` executáveis por `authenticated` (a 13.4 exige), políticas acessíveis ao usuário anônimo (a identidade do app é anônima), políticas permissivas múltiplas (nomes da 6.1) e índices ainda sem uso. | Todos vêm do próprio spec. |
 | Microtextos fora da seção 15 | Em `src/lib/copy.ts`, aprovados pelo Alexandre em 07/11/2026. | O spec não traz texto para rótulos e erros de formato. |
 | Mascote | Ilustrações do Higgsfield; no modo escuro a Bolacha ganha um halo claro. | Os traços cor de tinta sumiriam no fundo escuro (16.5). |
 | Anonimização (7.4 × 11.1 × 11.2 × 13.2) | Antes de desvincular, ficam de cada pessoa por bar só a última de cada assunto e a última positiva (esta com `peso = 0` se não for a última); o resto é apagado. | A 7.4 fala só em desvincular, mas sem `usuario_id` todas as evidências da pessoa passariam a somar (11.1) ou deixariam de anular o fechamento (11.2), dois bugs achados pelo verifier. O peso só é alterado nessa situação. |
@@ -649,3 +652,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Configuração em `app.config.ts` sem a marca (8.11) | Os textos de permissão do sistema dizem "chopp", sem a marca. | O hook e o teste de marca cobrem `app.config.ts`; o texto de permissão aparece também na revisão da loja. |
 | Disponibilidade na loja (8.11) | Só Brasil (decisão do Alexandre). | O conteúdo cobre só São Paulo (anti-escopo "app nacional"); o padrão da Dab Lab é todos os países. |
 | Evidência `curadoria` (8.11) | Tipo novo, peso +1,2 e meia-vida de 36.500 dias (na prática não decai). Gravada para os 33 bares do CSV original, que ficam `confirmado`. A semente (caso A da 11.2.1) não muda. | Decisão do Alexandre (08/11/2026): todos os bares do CSV têm chopp Brahma, e no lançamento, sem usuários, nada deve cair sozinho. Peso 1,2 porque com 1,0 o decaimento mínimo já deixava o bar abaixo do limite de confirmado. Uma confirmação negativa (−0,6) ainda derruba para provável. |
+| Marca dentro dos prints da loja (8.11) | As capturas do app mostram "chopp Brahma" no chat, no título da lista e no campo de texto, e "Tem Brahma?" na ficha. Os textos da ficha, o nome, o ícone e a imagem de destaque seguem sem a marca. | Decisão do Alexandre (08/11/2026): "pode manter a tela real. falar a palavra brahma em um chat nao é problema". Contraria a nota sobre a marca do spec; risco conhecido de reclamação de marca (Apple 5.2.1). Se a loja recusar, refazer os prints com as telas sem a palavra. |
+| Prints com dados de vitrine (8.11) | Opiniões, notas e carimbos de usuários de teste nas telas dos prints, apagados depois. | O plano pedia dados reais, mas a base ainda não tem uso; sem eles as telas ficavam vazias. |
+| Numeração de build no EAS (8.11) | `appVersionSource: remote` em vez de local. | O `autoIncrement` não funciona com `app.config.ts` dinâmico e numeração local. |
+| Envio antes do teste em aparelho (8.11) | Os builds foram enviados para revisão antes do teste num iPhone e num Android físicos (critério 4 do 8.11). | Pendente com o Alexandre: testar o build do TestFlight e o do teste interno da Play; se algo falhar, retirar o envio ou mandar um build novo. |
