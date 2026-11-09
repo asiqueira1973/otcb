@@ -25,6 +25,14 @@ export function createAgenteDb(admin: SupabaseClient, usuario: SupabaseClient): 
       return data;
     },
     mensagensHoje: (usuarioId) => rpc<number>(admin, "otcb_mensagens_hoje", { p_usuario: usuarioId }),
+    // 8.11: conta as mensagens das pessoas ao agente hoje, somando todas as contas (serviço; só a contagem).
+    async mensagensHojeTotal() {
+      const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+      const { count, error } = await admin.from("otcb_mensagens").select("id", { count: "exact", head: true })
+        .eq("papel", "usuario").gte("criado_em", new Date(`${hojeSp}T00:00:00-03:00`).toISOString());
+      if (error) throw new Error(`db_mensagens_total: ${error.message}`);
+      return count ?? 0;
+    },
     contexto: (usuarioId) => rpc(admin, "otcb_contexto_chat", { p_usuario: usuarioId }),
     async gravarMensagens(usuarioId, msgs) {
       // Instantes crescentes para a ordem do histórico ficar estável (a pergunta antes da resposta).

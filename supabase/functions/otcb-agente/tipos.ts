@@ -37,6 +37,8 @@ export interface AgenteDb {
   usuarioDoToken(token: string): Promise<string | null>;
   perfil(usuarioId: string): Promise<{ apelido: string; time_do_coracao: string | null } | null>;
   mensagensHoje(usuarioId: string): Promise<number>;
+  // 8.11: mensagens de todas as contas hoje (dia de São Paulo), para o teto geral de custo.
+  mensagensHojeTotal(): Promise<number>;
   contexto(usuarioId: string): Promise<{ papel: "usuario" | "assistente" | "sistema"; conteudo: string }[]>;
   gravarMensagens(usuarioId: string, msgs: { papel: "usuario" | "assistente"; conteudo: string; blocos: Bloco[] | null }[]): Promise<string[]>;
   marcarRevisaoMenor(usuarioId: string): Promise<void>;

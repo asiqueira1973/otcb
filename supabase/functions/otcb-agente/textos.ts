@@ -5,6 +5,8 @@ export const TEXTOS = {
   guardrailMenor: "O OTCB é só para maiores de 18 anos.",
   guardrailQuantidade: "Aqui a graça é a tirada, não a quantidade. Quer saber onde tem o colarinho mais bem avaliado?",
   guardrailCompra: "A gente não vende nem entrega bebida. Posso te mostrar bares perto de você.",
+  // (proposto 8.11) pedido fora do assunto do app (porteiro de escopo)
+  foraDoEscopo: "Aqui eu só ajudo com chopp Brahma, bares, jogos e o seu Passaporte. Quer que eu ache um bar perto de você?",
   // 15.8 — limite de mensagens (11.6)
   limiteMensagens: "Por hoje deu de conversa. Amanhã tem mais.",
   // 15.9 — IA fora

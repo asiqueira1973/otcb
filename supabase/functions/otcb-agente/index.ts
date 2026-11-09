@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { criarModeloAnthropic } from "./agente.ts";
 import { createAgenteDb } from "./db.ts";
+import { criarPorteiroEscopo } from "./escopo.ts";
 import { handleAgente } from "./handler.ts";
 
 const env = (nome: string) => Deno.env.get(nome) ?? "";
@@ -18,5 +19,6 @@ Deno.serve((req) =>
     })),
     modelo: () => criarModeloAnthropic(env("ANTHROPIC_API_KEY")),
     log: (evento) => console.log(JSON.stringify({ funcao: "otcb-agente", ...evento })),
+    escopo: criarPorteiroEscopo(env("ANTHROPIC_API_KEY")),
   })
 );

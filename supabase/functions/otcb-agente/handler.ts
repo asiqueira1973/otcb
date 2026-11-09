@@ -1,4 +1,5 @@
 import { IaIndisponivel, rodarAgente, type ModeloAgente } from "./agente.ts";
+import { temVocabularioDoApp } from "./escopo.ts";
 import { verificarGuardrail } from "./guardrails.ts";
 import { TEXTOS } from "./textos.ts";
 import type { AgenteDb } from "./tipos.ts";
@@ -7,12 +8,16 @@ import type { AgenteDb } from "./tipos.ts";
 
 // 11.6: até 40 mensagens do usuário ao agente por dia (dia de São Paulo).
 export const LIMITE_DIARIO = 40;
+// 8.11 (custo): teto diário de mensagens ao agente somando todas as contas (contas anônimas em massa).
+export const LIMITE_GLOBAL_DIARIO = 2000;
 
 export type DepsAgente = {
   // Banco com o JWT do usuário para as ferramentas e serviço para o resto (ver db.ts).
   db: (token: string) => AgenteDb;
   modelo: () => ModeloAgente;
   log: (evento: Record<string, unknown>) => void;
+  // 8.11: porteiro de escopo (true = mensagem sobre o app). Ausente ou com falha, a mensagem passa.
+  escopo?: (mensagem: string) => Promise<boolean>;
 };
 
 const CORS = {
@@ -80,6 +85,10 @@ export async function handleAgente(req: Request, deps: DepsAgente): Promise<Resp
   const consultar = (id: string) => Promise.all([db.mensagensHoje(id), db.contexto(id), db.perfil(id)]);
   const adiantadas = entrada && !guardrail && sub ? consultar(sub) : null;
   adiantadas?.catch(() => undefined); // evita rejeição sem tratamento se o token não valer
+  // 8.11: o porteiro corre em paralelo com as consultas; falha ou ausência = no escopo (o prompt v11 segura).
+  const noEscopo = entrada && !guardrail && deps.escopo && !temVocabularioDoApp(entrada.mensagem)
+    ? deps.escopo(entrada.mensagem).catch(() => true)
+    : Promise.resolve(true);
 
   const usuarioId = await verificacao;
   if (!usuarioId || (sub !== null && sub !== usuarioId)) return json(401, { codigo: "nao_autenticado" });
@@ -103,6 +112,22 @@ export async function handleAgente(req: Request, deps: DepsAgente): Promise<Resp
     if (hoje >= LIMITE_DIARIO) {
       deps.log({ evento: "limite_mensagens" });
       return json(429, { codigo: "limite_mensagens", texto: TEXTOS.limiteMensagens });
+    }
+
+    // 8.11: pedido fora do assunto do app não chega ao agente; a resposta fixa é gravada e conta no limite.
+    if (!(await noEscopo)) {
+      deps.log({ evento: "fora_do_escopo" });
+      const [, respostaId] = await db.gravarMensagens(usuarioId, [
+        { papel: "usuario", conteudo: entrada.mensagem, blocos: null },
+        { papel: "assistente", conteudo: TEXTOS.foraDoEscopo, blocos: null },
+      ]);
+      return json(200, { mensagem_id: respostaId, texto: TEXTOS.foraDoEscopo, blocos: [], bloqueada_guardrail: true });
+    }
+
+    // 8.11: teto diário de todas as contas; passou dele, o app mostra "tenta de novo" e a IA não é chamada.
+    if ((await db.mensagensHojeTotal()) >= LIMITE_GLOBAL_DIARIO) {
+      deps.log({ evento: "teto_global" });
+      return json(503, { codigo: "ia_indisponivel", texto: TEXTOS.iaFora });
     }
 
     const inicio = Date.now();
