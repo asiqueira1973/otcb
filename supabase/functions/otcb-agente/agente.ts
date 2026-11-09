@@ -6,8 +6,9 @@ import { PROMPT_AGENTE_V12 } from "./prompts/agente.v12.ts";
 import { TEXTOS } from "./textos.ts";
 import type { AgenteDb, Bloco } from "./tipos.ts";
 
-// Loop do agente do chat (seções 4.1, 13.1 e 13.3). Modelo da seção 4.1: claude-sonnet-5-5.
-export const MODELO_AGENTE = "claude-sonnet-5-5";
+// Loop do agente do chat (seções 4.1, 13.1 e 13.3). A seção 4.1 previa o claude-sonnet-5-5; desde 08/11/2026 o
+// agente usa o claude-haiku-5-5 por custo (decisão do Alexandre, emenda do 8.11).
+export const MODELO_AGENTE = "claude-haiku-5-5";
 // 13.1: no máximo 5 rodadas de ferramenta por mensagem; depois disso o modelo responde só com texto.
 export const MAX_RODADAS = 5;
 
@@ -108,7 +109,7 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
         tools: FERRAMENTAS,
         tool_choice: rodada === MAX_RODADAS ? { type: "none" } : { type: "auto" },
         messages,
-        // Critério 8: esforço baixo. O claude-sonnet-5-5 não aceita thinking desligado (400, testado em 8.4).
+        // Critério 8: esforço baixo. O claude-sonnet-5-5 não aceitava thinking desligado (400, testado em 8.4).
         output_config: { effort: "low" },
       } as Anthropic.MessageCreateParamsNonStreaming);
     } catch (error) {
@@ -144,6 +145,10 @@ export async function rodarAgente(entrada: EntradaAgente, db: AgenteDb, modelo: 
   }
 
   // Sem texto final: com cards, o handler usa o texto padrão; sem nada, o último rascunho é melhor que vazio.
+  // Bug da troca para o Haiku (8.11): Passaporte consultado e card esquecido → o servidor mostra o card.
+  if (turno.cache.passaporte && !turno.blocos.some((b) => b.tipo === "passaporte")) {
+    turno.blocos.push({ tipo: "passaporte", ...turno.cache.passaporte });
+  }
   let texto = (textos.join("\n\n") || (turno.blocos.length === 0 ? rascunhos.at(-1) ?? "" : "")).trim();
   // Bug do 8.11: sem jogo do time hoje na base, a resposta não pode afirmar que ele não joga (pode jogar em
   // competição que a base não cobre). O servidor reescreve a afirmação e garante o aviso de cobertura.

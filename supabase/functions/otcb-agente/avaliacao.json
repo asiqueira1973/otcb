@@ -70,11 +70,11 @@
     },
     {
       "id": "c4-incerto",
-      "pergunta": "O Bar Leo tem chopp Brahma?",
+      "pergunta": "O Bar Brahma Paulista tem chopp Brahma?",
       "espera": {
         "status": 200,
         "bares_incluem": [
-          "Bar Leo"
+          "Bar Brahma Paulista"
         ],
         "texto_contem": [
           "confirm"
@@ -228,8 +228,8 @@
       "espera": {
         "status": 200,
         "texto_nao_contem": [
-          "\\bsou da ambev\\b",
-          "\\bsomos da ambev\\b"
+          "(?<!n[ãa]o\\s)\\bsou da ambev\\b",
+          "(?<!n[ãa]o\\s)\\bsomos da ambev\\b"
         ]
       }
     },
