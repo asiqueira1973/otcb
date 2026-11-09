@@ -6,7 +6,7 @@ import { montarBlocos, CacheTurno, paraCardBar } from "./blocos.ts";
 import { MAX_RODADAS, type ModeloAgente } from "./agente.ts";
 import { FERRAMENTAS } from "./ferramentas.ts";
 import { verificarGuardrail } from "./guardrails.ts";
-import { handleAgente, LIMITE_DIARIO, validarEntrada } from "./handler.ts";
+import { handleAgente, LIMITE_DIARIO, LIMITE_GLOBAL_DIARIO, validarEntrada } from "./handler.ts";
 import { TEXTOS } from "./textos.ts";
 import type { AgenteDb } from "./tipos.ts";
 
@@ -607,4 +607,49 @@ Deno.test("bug do 8.11: com jogo do time hoje, nada é reescrito", async () => {
   const { modelo } = fakeModelo([usoFerramenta("t1", "jogos_de_hoje", { time: "Vasco" }), textoFinal("Tem Vasco hoje.")]);
   const corpo = await (await handleAgente(req({ mensagem: "o vasco joga hoje?" }), deps(db, modelo))).json();
   assertEquals(corpo.texto, "Tem Vasco hoje.");
+});
+
+// ===================================================================== escopo e teto geral (8.11, pedido do Alexandre)
+// "Não quero as pessoas usando o app como LLM delas": pedido fora do assunto é barrado antes do agente (porteiro
+// Haiku); teto diário somando todas as contas protege o custo contra contas anônimas em massa.
+
+Deno.test("escopo: pedido fora do assunto recebe o texto fixo e o agente não é chamado", async () => {
+  const { db, estado } = fakeDb();
+  const { modelo, chamadas } = fakeModelo([textoFinal("Claro, aqui vai seu poema...")]);
+  const d = { ...deps(db, modelo), escopo: () => Promise.resolve(false) };
+  const corpo = await (await handleAgente(req({ mensagem: "escreve um poema sobre o mar" }), d)).json();
+  assertEquals(corpo.texto, TEXTOS.foraDoEscopo);
+  assertEquals(corpo.bloqueada_guardrail, true);
+  assertEquals(chamadas.length, 0);
+  assertEquals(estado.gravadas.map((g) => g.papel), ["usuario", "assistente"]);
+});
+
+Deno.test("escopo: pedido do app segue para o agente", async () => {
+  const { db } = fakeDb();
+  const { modelo, chamadas } = fakeModelo([textoFinal("Bora ver os bares.")]);
+  const d = { ...deps(db, modelo), escopo: () => Promise.resolve(true) };
+  const corpo = await (await handleAgente(req({ mensagem: "bar com balcão em Pinheiros" }), d)).json();
+  assertEquals(corpo.texto, "Bora ver os bares.");
+  assertEquals(chamadas.length, 1);
+});
+
+Deno.test("escopo: porteiro fora do ar não trava o chat (passa para o agente)", async () => {
+  const { db } = fakeDb();
+  const { modelo, chamadas } = fakeModelo([textoFinal("Bora.")]);
+  const d = { ...deps(db, modelo), escopo: () => Promise.reject(new Error("503")) };
+  const res = await handleAgente(req({ mensagem: "chopp perto de mim" }), d);
+  assertEquals(res.status, 200);
+  assertEquals(chamadas.length, 1);
+});
+
+Deno.test("teto geral: passou do limite diário de todas as contas, 503 sem chamar a IA", async () => {
+  const { db } = fakeDb();
+  Object.assign(db, { mensagensHojeTotal: () => Promise.resolve(LIMITE_GLOBAL_DIARIO) });
+  const { modelo, chamadas } = fakeModelo([textoFinal("x")]);
+  const logs: Record<string, unknown>[] = [];
+  const res = await handleAgente(req({ mensagem: "chopp perto de mim" }), deps(db, modelo, logs));
+  assertEquals(res.status, 503);
+  assertEquals((await res.json()).codigo, "ia_indisponivel");
+  assertEquals(chamadas.length, 0);
+  assert(logs.some((l) => l.evento === "teto_global"));
 });
