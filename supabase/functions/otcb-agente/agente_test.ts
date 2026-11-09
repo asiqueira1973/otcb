@@ -25,6 +25,7 @@ function fakeDb(opts: { hoje?: number; bares?: Record<string, unknown>[] } = {})
     usuarioDoToken: (t) => Promise.resolve(t === "token-ok" ? "u1" : null),
     perfil: () => Promise.resolve({ apelido: "ana_sp", time_do_coracao: null }),
     mensagensHoje: () => Promise.resolve(opts.hoje ?? 0),
+    mensagensHojeTotal: () => Promise.resolve(0),
     contexto: () => Promise.resolve([]),
     gravarMensagens: (_u, msgs) => {
       estado.gravadas.push(...msgs);
@@ -652,4 +653,17 @@ Deno.test("teto geral: passou do limite diário de todas as contas, 503 sem cham
   assertEquals((await res.json()).codigo, "ia_indisponivel");
   assertEquals(chamadas.length, 0);
   assert(logs.some((l) => l.evento === "teto_global"));
+});
+
+// Bug real do 8.11 (avaliação): o porteiro barrou "O Bar Leo tem chopp Brahma?" (2 de 2 vezes). Mensagem com o
+// vocabulário do app não passa pelo porteiro.
+Deno.test("escopo: mensagem com vocabulário do app vai direto ao agente, sem consultar o porteiro", async () => {
+  const { db } = fakeDb();
+  const { modelo, chamadas } = fakeModelo([textoFinal("O Bar Leo está a confirmar.")]);
+  let consultou = false;
+  const d = { ...deps(db, modelo), escopo: () => { consultou = true; return Promise.resolve(false); } };
+  const corpo = await (await handleAgente(req({ mensagem: "O Bar Leo tem chopp Brahma?" }), d)).json();
+  assertEquals(corpo.texto, "O Bar Leo está a confirmar.");
+  assertEquals(chamadas.length, 1);
+  assertFalse(consultou);
 });
