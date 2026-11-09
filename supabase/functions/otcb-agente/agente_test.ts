@@ -667,3 +667,14 @@ Deno.test("escopo: mensagem com vocabulário do app vai direto ao agente, sem co
   assertEquals(chamadas.length, 1);
   assertFalse(consultou);
 });
+
+// Bug real da troca para o Haiku (8.11): consultou o Passaporte, escreveu o texto e não mostrou o card. O servidor
+// acrescenta o card quando meu_passaporte foi consultado e o modelo não o mostrou.
+Deno.test("bug do 8.11: Passaporte consultado sem card → o servidor acrescenta o card", async () => {
+  const { db } = fakeDb();
+  db.meuPassaporte = () => Promise.resolve({ carimbos: [{ bar_id: "b1" }], colecoes_bairro: [], selos: [] });
+  const { modelo } = fakeModelo([usoFerramenta("t1", "meu_passaporte", {}), textoFinal("Você tem 1 carimbo.")]);
+  const corpo = await (await handleAgente(req({ mensagem: "meu passaporte" }), deps(db, modelo))).json();
+  assertEquals(corpo.texto, "Você tem 1 carimbo.");
+  assertEquals(corpo.blocos.map((b: { tipo: string }) => b.tipo), ["passaporte"]);
+});
