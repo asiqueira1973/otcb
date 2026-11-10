@@ -32,13 +32,16 @@ Sem a marca de cerveja em nenhum campo (nota sobre a marca do spec; hook `guard-
 
 ## Segurança dos dados (Data safety)
 
+> Recusa de 10/11/2026 (versionCode 3): faltava declarar a localização aproximada e a exata. As duas linhas de Local abaixo resolvem.
+
 - **Coleta dados?** Sim. **Compartilha com terceiros?** Sim, só para processamento (Anthropic / Claude API: textos do chat e fotos) — marcar como "processamento em nome do desenvolvedor" (prestador de serviço), não compartilhamento.
 - **Criptografia em trânsito:** Sim (HTTPS).
 - **O usuário pode pedir exclusão?** Sim — "Apagar meus dados" no Perfil, imediato; e pelo e-mail de contato.
 
 | Tipo de dado (Play) | Coletado | Opcional? | Finalidade |
 |---|---|---|---|
-| Local → Local exato | Sim, efêmero (processado na hora, não guardado) | Sim (permissão) | Funcionalidade do app |
+| Local → Local exato | Sim, processado de forma efêmera (usado na hora, não guardado); não compartilhado | Sim (permissão) | Funcionalidade do app |
+| Local → Local aproximado | Sim, processado de forma efêmera; não compartilhado (o Android pede as duas permissões juntas) | Sim (permissão) | Funcionalidade do app |
 | Fotos e vídeos → Fotos | Sim | Sim (só se usar o Colarinhômetro) | Funcionalidade do app |
 | Mensagens no app / Outro conteúdo gerado pelo usuário | Sim (chat 30 dias, opiniões) | Sim | Funcionalidade do app |
 | IDs do app → ID do usuário | Sim (identidade anônima) | Não | Funcionalidade do app, Análise |
