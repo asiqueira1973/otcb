@@ -62,7 +62,7 @@ export function validarEntrada(corpo: unknown): { mensagem: string; local: { lat
 }
 
 // Atende POST /otcb-agente. Ordem da 13.1: autenticação → validação → guardrail 11.18 → limite 11.6 →
-// contexto 11.13 → modelo com ferramentas → grava mensagem do usuário e resposta em otcb_mensagens.
+// teto geral e porteiro de escopo 8.11 → contexto 11.13 → modelo com ferramentas → grava mensagem do usuário e resposta em otcb_mensagens.
 // Devolve: 200 { mensagem_id, texto, blocos, bloqueada_guardrail }; 401; 405; 422; 429 limite_mensagens;
 // 503 ia_indisponivel (nada é gravado nesse caso, e o app mostra "tentar de novo").
 export async function handleAgente(req: Request, deps: DepsAgente): Promise<Response> {
@@ -85,11 +85,6 @@ export async function handleAgente(req: Request, deps: DepsAgente): Promise<Resp
   const consultar = (id: string) => Promise.all([db.mensagensHoje(id), db.contexto(id), db.perfil(id)]);
   const adiantadas = entrada && !guardrail && sub ? consultar(sub) : null;
   adiantadas?.catch(() => undefined); // evita rejeição sem tratamento se o token não valer
-  // 8.11: o porteiro corre em paralelo com as consultas; falha ou ausência = no escopo (o prompt v11 segura).
-  const noEscopo = entrada && !guardrail && deps.escopo && !temVocabularioDoApp(entrada.mensagem)
-    ? deps.escopo(entrada.mensagem).catch(() => true)
-    : Promise.resolve(true);
-
   const usuarioId = await verificacao;
   if (!usuarioId || (sub !== null && sub !== usuarioId)) return json(401, { codigo: "nao_autenticado" });
   if (!entrada) return json(422, { codigo: "mensagem_invalida" });
@@ -114,20 +109,27 @@ export async function handleAgente(req: Request, deps: DepsAgente): Promise<Resp
       return json(429, { codigo: "limite_mensagens", texto: TEXTOS.limiteMensagens });
     }
 
+    // 8.11: teto diário de todas as contas; passou dele, o app mostra "tenta de novo" e a IA não é chamada.
+    if ((await db.mensagensHojeTotal()) >= LIMITE_GLOBAL_DIARIO) {
+      deps.log({ evento: "teto_global" });
+      return json(503, { codigo: "ia_indisponivel", texto: TEXTOS.iaFora });
+    }
+
+    // 8.11: o porteiro é uma chamada paga à IA. Só roda depois de confirmar o usuário, o limite dele e o teto
+    // geral — antes, corria em paralelo e uma requisição com token inválido ou acima do limite já gerava custo.
+    // Falha ou ausência = no escopo (o prompt v11 segura).
+    const noEscopo = deps.escopo && !temVocabularioDoApp(entrada.mensagem)
+      ? await deps.escopo(entrada.mensagem).catch(() => true)
+      : true;
+
     // 8.11: pedido fora do assunto do app não chega ao agente; a resposta fixa é gravada e conta no limite.
-    if (!(await noEscopo)) {
+    if (!noEscopo) {
       deps.log({ evento: "fora_do_escopo" });
       const [, respostaId] = await db.gravarMensagens(usuarioId, [
         { papel: "usuario", conteudo: entrada.mensagem, blocos: null },
         { papel: "assistente", conteudo: TEXTOS.foraDoEscopo, blocos: null },
       ]);
       return json(200, { mensagem_id: respostaId, texto: TEXTOS.foraDoEscopo, blocos: [], bloqueada_guardrail: true });
-    }
-
-    // 8.11: teto diário de todas as contas; passou dele, o app mostra "tenta de novo" e a IA não é chamada.
-    if ((await db.mensagensHojeTotal()) >= LIMITE_GLOBAL_DIARIO) {
-      deps.log({ evento: "teto_global" });
-      return json(503, { codigo: "ia_indisponivel", texto: TEXTOS.iaFora });
     }
 
     const inicio = Date.now();
