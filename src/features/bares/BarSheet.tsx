@@ -136,6 +136,17 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
         style={[styles.sheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + 16 }, sheetStyle]}
       >
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
+        {/* Botão Fechar (relato do Alexandre, 13/11/2026: a Ficha só fechava tocando fora dela). */}
+        <Pressable
+          testID="ficha-fechar"
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel={copy.sheet.close}
+          hitSlop={12}
+          style={styles.fechar}
+        >
+          <Text style={[styles.fecharTexto, { color: theme.textMuted }]}>✕</Text>
+        </Pressable>
         {!bar ? (
           failed ? (
             <Text style={[styles.body, { color: theme.text }]}>{copy.sheet.loadError}</Text>
@@ -239,9 +250,11 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
 const styles = StyleSheet.create({
   backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '88%', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 10 },
+  fechar: { position: 'absolute', top: 12, right: 16, zIndex: 2, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  fecharTexto: { fontSize: 22, fontWeight: '600' },
   handle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, marginBottom: 8 },
   content: { paddingHorizontal: 20, gap: 10, paddingBottom: 12 },
-  title: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 34, lineHeight: 37 },
+  title: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 34, lineHeight: 37, paddingRight: 40 },
   section: { fontFamily: fonts.title, letterSpacing: 0.5, fontSize: 24, marginTop: 8 },
   meta: { fontFamily: fonts.body, fontSize: 15 },
   body: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22 },

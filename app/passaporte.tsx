@@ -101,6 +101,15 @@ function Conteudo() {
               {dados.carimbos.map((c) => <Stamp key={c.carimbo_id} carimbo={c} onPress={() => openBar(c.bar_id)} />)}
             </View>
 
+            {/* Selos antes dos bairros (pedido do Alexandre, 13/11/2026). */}
+            <Text accessibilityRole="header" style={[styles.secao, { color: theme.text }]}>{copy.passport.seals}</Text>
+            {novos.length > 0 ? (
+              <Text accessibilityLiveRegion="polite" style={[styles.novo, { color: palette.confirmed }]}>
+                {novos.map((s) => copy.passport.newSeal(copy.seals[s] ?? s)).join(' ')}
+              </Text>
+            ) : null}
+            {dados.selos.map((s) => <SealBadge key={s.selo} selo={s} novo={novos.includes(s.selo)} />)}
+
             <Text accessibilityRole="header" style={[styles.secao, { color: theme.text }]}>{copy.passport.neighborhoods}</Text>
             {bairros.map((c) => (
               <View key={c.bairro} testID={`bairro-${c.bairro}`} accessible accessibilityLabel={copy.passport.neighborhoodLabel(c.bairro, c.carimbos, c.total_bares)} style={styles.colecao}>
@@ -123,13 +132,6 @@ function Conteudo() {
               </View>
             ) : null}
 
-            <Text accessibilityRole="header" style={[styles.secao, { color: theme.text }]}>{copy.passport.seals}</Text>
-            {novos.length > 0 ? (
-              <Text accessibilityLiveRegion="polite" style={[styles.novo, { color: palette.confirmed }]}>
-                {novos.map((s) => copy.passport.newSeal(copy.seals[s] ?? s)).join(' ')}
-              </Text>
-            ) : null}
-            {dados.selos.map((s) => <SealBadge key={s.selo} selo={s} novo={novos.includes(s.selo)} />)}
           </>
         ) : null}
       </ScrollView>
