@@ -78,6 +78,8 @@ jest.mock('expo-file-system', () => {
     constructor(...partes: unknown[]) { this.uri = partes.map((p) => (typeof p === 'string' ? p : (p as { uri: string }).uri)).join('/'); }
     copy() {}
     delete() {}
+    // O File real implementa Blob; o expo/fetch lê o conteúdo por bytes() ao montar o multipart.
+    bytes() { return Promise.resolve(new Uint8Array([0xff, 0xd8, 0xff])); }
   }
   return { Directory, File, Paths: { document: { uri: 'file:///docs' }, cache: { uri: 'file:///cache' } } };
 });

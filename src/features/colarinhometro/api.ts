@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 import type { Coords } from '../../lib/location';
@@ -24,7 +25,9 @@ export async function enviarFoto(uri: string, coords: Coords | null, confirmou: 
   const token = data.session?.access_token;
   if (!token) return { ok: false, falha: 'erro' };
   const form = new FormData();
-  form.append('imagem', { uri, name: 'foto.jpg', type: 'image/jpeg' } as unknown as Blob);
+  // Bug em produção (13/11/2026): o fetch do build é o expo/fetch (Expo SDK 58), que não aceita { uri, name, type }
+  // no FormData e lança antes de enviar (aparecia como "sem rede"). O File do expo-file-system implementa Blob.
+  form.append('imagem', new File(uri) as unknown as Blob);
   if (coords) {
     form.append('latitude', String(coords.latitude));
     form.append('longitude', String(coords.longitude));

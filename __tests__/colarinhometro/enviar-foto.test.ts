@@ -15,12 +15,16 @@ beforeEach(() => {
 });
 
 it('a imagem vai no FormData como File (com bytes), não como { uri }', async () => {
+  // Captura o valor bruto passado ao append (o FormData do Node, nos testes, converte objetos em texto).
+  const anexos: [string, unknown][] = [];
+  const append = jest.spyOn(FormData.prototype, 'append').mockImplementation(function (nome: string, valor: unknown) {
+    anexos.push([nome, valor]);
+  } as unknown as typeof FormData.prototype.append);
   const r = await enviarFoto('file:///tmp/foto.jpg', { latitude: -23.5, longitude: -46.6 }, 'sim', '2026-11-13T22:00:00Z');
+  append.mockRestore();
   expect(r.ok).toBe(true);
-  const form = mockFetch.mock.calls[0][1].body as FormData & { getParts?: () => { fieldName: string; string?: string }[] };
-  const partes = (form as unknown as { _parts: [string, unknown][] })._parts;
-  const imagem = partes.find(([nome]) => nome === 'imagem')?.[1] as Record<string, unknown>;
+  const imagem = anexos.find(([nome]) => nome === 'imagem')?.[1] as Record<string, unknown>;
   expect(imagem).toBeDefined();
   expect(typeof (imagem as { bytes?: unknown }).bytes).toBe('function');
-  expect(imagem).not.toEqual(expect.objectContaining({ type: 'image/jpeg', name: 'foto.jpg', uri: 'file:///tmp/foto.jpg' }));
+  expect((imagem as { uri?: string }).uri).toBe('file:///tmp/foto.jpg');
 });
