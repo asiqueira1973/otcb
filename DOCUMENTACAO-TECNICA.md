@@ -552,6 +552,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Sintoma:** no app da loja, a foto do Colarinhômetro (pela câmera ou pelo chat) dava "sem rede" e ia para a fila, com rede boa. Nenhuma requisição chegava à `otcb-colarinhometro`.
 - **Causa:** no Expo SDK 58 o `fetch` global é o `expo/fetch`, que não aceita a parte de arquivo `{ uri, name, type }` do FormData do React Native (lança antes de enviar; o app tratava como rede). No Expo Go e nos testes isso não aparecia.
 - **Correção:** a foto vai como `File` do `expo-file-system` (implementa Blob, lido por `bytes()`). Teste `__tests__/colarinhometro/enviar-foto.test.ts`. Versão 1.0.1 (build novo nas duas lojas).
+- **Versão 1.0.1** (correção da foto, botão Fechar na Ficha, selos antes dos bairros no Passaporte): iOS build 3 e Android versionCode 5. O envio iOS pelo EAS (chave da API) falhou com "required Apple agreement is missing" mesmo depois do aceite dos contratos; o `.ipa` foi enviado pelo Transporter e submetido à revisão em 13/11/2026. O `.aab` vai pelo Play Console.
 - **No mesmo dia:** curadoria da Pizzaria Piarello (o Alexandre tomou chopp Brahma lá) e o carimbo dele na Piarello gravado a partir da foto que mandou, com a nota real da IA do Colarinhômetro (6,9).
 
 ### Escopo do chat e teto de custo (emenda do 8.11)
