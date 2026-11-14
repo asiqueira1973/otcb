@@ -35,3 +35,10 @@ secrets/
 
 # Referências de design locais (fora do git)
 referencias de telas.pdf
+
+# --- Segredos e credenciais (nunca versionar) ---
+GoogleService-Info.plist
+google-services.json
+*.keystore
+key.properties
+local.properties
