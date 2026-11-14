@@ -7,7 +7,7 @@ const config: ExpoConfig = {
   name: 'OTCB',
   slug: 'otcb',
   owner: 'alexsiq',
-  version: '1.0.0',
+  version: '1.0.1',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
