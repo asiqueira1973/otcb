@@ -93,3 +93,12 @@ it('verifier 8.8: toque duplo em "Ver mais" busca a página uma vez só', async 
   expect(mockRpc.mock.calls.filter((c) => c[1].p_pagina === 1)).toHaveLength(1);
   expect(screen.getAllByText('Opinião 10')).toHaveLength(1);
 });
+
+// Bug relatado pelo Alexandre (13/11/2026): a Ficha só fechava tocando fora dela. Agora tem botão "Fechar".
+it('a Ficha tem um botão Fechar que fecha a janela', async () => {
+  mockRpc.mockResolvedValue({ data: [], error: null });
+  await abrir();
+  await waitFor(() => expect(screen.getByTestId('ficha-bar')).toBeTruthy());
+  await fireEvent.press(screen.getByTestId('ficha-fechar'));
+  await waitFor(() => expect(screen.queryByTestId('ficha-bar')).toBeNull());
+});

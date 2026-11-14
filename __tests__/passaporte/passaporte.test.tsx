@@ -131,3 +131,12 @@ it('11.11: todos os bairros com bares ativos aparecem, com os que têm carimbo p
   const ordem = screen.getAllByTestId(/^bairro-/).map((n) => n.props.testID);
   expect(ordem).toEqual(['bairro-Moema', 'bairro-Santa Ifigênia', 'bairro-Pinheiros', 'bairro-Itaim Bibi']);
 });
+
+// Pedido do Alexandre (13/11/2026): os selos vêm antes dos bairros.
+it('a seção de selos aparece antes da de bairros', async () => {
+  await renderWithSafeArea(<Passaporte />);
+  await waitFor(() => expect(screen.getByText('3 bares carimbados')).toBeTruthy());
+  const titulos = screen.getAllByRole('header').map((h) => String(h.props.children));
+  expect(titulos.indexOf(copy.passport.seals)).toBeGreaterThan(-1);
+  expect(titulos.indexOf(copy.passport.seals)).toBeLessThan(titulos.indexOf(copy.passport.neighborhoods));
+});
