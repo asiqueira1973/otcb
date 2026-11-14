@@ -548,6 +548,12 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Agente:** `COBERTURA_JOGOS` e `TEXTOS.coberturaJogos` com o novo alcance; prompt v10.
 - **Checagem real (08/11/2026):** a carga gravou 44 jogos de hoje e amanhã (Copa do Brasil, Série B, Pernambucano, ligas europeias) e "o vasco joga hoje?" respondeu "Joga sim! Vasco x Palmeiras, pela Copa do Brasil, hoje às 17h" com o card de jogos. Os jogos antigos do football-data (sem prefixo `af:`) foram apagados na troca.
 
+### Bug da foto em produção e versão 1.0.1 (13/11/2026)
+- **Sintoma:** no app da loja, a foto do Colarinhômetro (pela câmera ou pelo chat) dava "sem rede" e ia para a fila, com rede boa. Nenhuma requisição chegava à `otcb-colarinhometro`.
+- **Causa:** no Expo SDK 58 o `fetch` global é o `expo/fetch`, que não aceita a parte de arquivo `{ uri, name, type }` do FormData do React Native (lança antes de enviar; o app tratava como rede). No Expo Go e nos testes isso não aparecia.
+- **Correção:** a foto vai como `File` do `expo-file-system` (implementa Blob, lido por `bytes()`). Teste `__tests__/colarinhometro/enviar-foto.test.ts`. Versão 1.0.1 (build novo nas duas lojas).
+- **No mesmo dia:** curadoria da Pizzaria Piarello (o Alexandre tomou chopp Brahma lá) e o carimbo dele na Piarello gravado a partir da foto que mandou, com a nota real da IA do Colarinhômetro (6,9).
+
 ### Escopo do chat e teto de custo (emenda do 8.11)
 - **Pedido do Alexandre:** o app não pode virar um assistente genérico de graça, mas deve aceitar curiosidade e papo do tema (bar, boteco, chopp, cerveja, futebol).
 - **Porteiro (`otcb-agente/escopo.ts`):** antes do agente, o `claude-haiku-5-5` responde `{no_escopo}` em JSON. Roda em paralelo com as consultas ao banco (cerca de 1 s). Fora do escopo: resposta fixa `TEXTOS.foraDoEscopo` (proposto 8.11), gravada como as do guardrail, contando no limite de 40/dia, sem chamar o agente. Mensagem com vocabulário do app (chopp, Brahma, bar, boteco, colarinho, cerveja, jogo, time, Passaporte…) nem passa pelo porteiro: ele barrou "O Bar Leo tem chopp Brahma?" na avaliação (bug corrigido com teste). Porteiro fora do ar ou fora do contrato: a mensagem passa.
