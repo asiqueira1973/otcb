@@ -655,6 +655,41 @@ Deno.test("teto geral: passou do limite diário de todas as contas, 503 sem cham
   assert(logs.some((l) => l.evento === "teto_global"));
 });
 
+// Auditoria de 14/11/2026: o porteiro é uma chamada paga à IA e corria antes da autenticação e do limite.
+Deno.test("custo: token inválido não consulta o porteiro", async () => {
+  const { db } = fakeDb();
+  Object.assign(db, { usuarioDoToken: () => Promise.resolve(null) });
+  const { modelo, chamadas } = fakeModelo([textoFinal("x")]);
+  let consultou = false;
+  const d = { ...deps(db, modelo), escopo: () => { consultou = true; return Promise.resolve(true); } };
+  const res = await handleAgente(req({ mensagem: "escreve um poema sobre o mar" }), d);
+  assertEquals(res.status, 401);
+  assertEquals(chamadas.length, 0);
+  assertFalse(consultou);
+});
+
+Deno.test("custo: acima do limite diário não consulta o porteiro", async () => {
+  const { db } = fakeDb();
+  Object.assign(db, { mensagensHoje: () => Promise.resolve(LIMITE_DIARIO) });
+  const { modelo } = fakeModelo([textoFinal("x")]);
+  let consultou = false;
+  const d = { ...deps(db, modelo), escopo: () => { consultou = true; return Promise.resolve(true); } };
+  const res = await handleAgente(req({ mensagem: "escreve um poema sobre o mar" }), d);
+  assertEquals(res.status, 429);
+  assertFalse(consultou);
+});
+
+Deno.test("custo: acima do teto geral não consulta o porteiro", async () => {
+  const { db } = fakeDb();
+  Object.assign(db, { mensagensHojeTotal: () => Promise.resolve(LIMITE_GLOBAL_DIARIO) });
+  const { modelo } = fakeModelo([textoFinal("x")]);
+  let consultou = false;
+  const d = { ...deps(db, modelo), escopo: () => { consultou = true; return Promise.resolve(true); } };
+  const res = await handleAgente(req({ mensagem: "escreve um poema sobre o mar" }), d);
+  assertEquals(res.status, 503);
+  assertFalse(consultou);
+});
+
 // Bug real do 8.11 (avaliação): o porteiro barrou "O Bar Leo tem chopp Brahma?" (2 de 2 vezes). Mensagem com o
 // vocabulário do app não passa pelo porteiro.
 Deno.test("escopo: mensagem com vocabulário do app vai direto ao agente, sem consultar o porteiro", async () => {

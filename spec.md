@@ -129,7 +129,7 @@ Esta regra é inegociável e tem guardrail executável (seção 18.1).
 - P1. Limite de tempo de execução das Edge Functions comporta lotes de até 20 itens do garimpo por invocação.
 - P2. O plano gratuito do football-data.org inclui o Brasileirão Série A.
 - P3. Os termos do Google Maps Platform permitem guardar `place_id` sem prazo e coordenadas por até 30 dias, desde que renovadas (regra 11.10).
-- P4. **Decidido (Alexandre, 07/11/2026):** o OTCB fica no BANCO DE TESTE e o login anônimo será ligado nele, mesmo sabendo que as tabelas `livros_` e `precos_acoes` liberam acesso a qualquer usuário autenticado. Motivo: evitar custo de um projeto novo; o app de livros é um experimento sem usuários e será aposentado (seção 23).
+- P4. **Decidido (Alexandre, 07/11/2026):** o OTCB fica no BANCO DE TESTE e o login anônimo será ligado nele, mesmo sabendo que tabelas de outros apps nesse banco têm políticas mais abertas do que deveriam. Motivo: evitar custo de um projeto novo; o app de livros é um experimento sem usuários e será aposentado (seção 23).
 
 ### 4.2 O que roda onde
 
@@ -1412,7 +1412,7 @@ Eventos (prefixo `otcb_`, sem texto de mensagem, sem localização, sem foto):
 | Nota do Colarinhômetro inconsistente entre fotos parecidas | Médio | Média | Pesos fixos fora do modelo; conjunto de 30 fotos de referência para calibrar o prompt antes do lançamento. |
 | Uso por menores | Alto | Baixa | Classificação 18+, declaração de idade, guardrail 11.18. |
 | Banco de teste compartilhado com outros apps | Médio | Baixa | Prefixo `otcb_`; migrations só tocam objetos `otcb_`; revisar advisors; migrar para projeto próprio se o app crescer. |
-| Ligar login anônimo no BANCO DE TESTE expor dados de outros apps (P4) | Alto | **Confirmado em 07/11/2026**: `livros_livros`, `livros_editoras`, `livros_lidos` e `livros_livrarias` liberam select, insert, update e delete para qualquer `authenticated`, e `precos_acoes` libera select. Com o login anônimo ligado, qualquer pessoa com o OTCB instalado poderia ler e apagar esses dados. | **Risco aceito** pelo Alexandre (07/11/2026): o app de livros é experimento sem usuários e será aposentado. O agente de código **não altera** objetos fora do prefixo `otcb_`. Regra para o futuro: nenhum app novo neste projeto cria política que libere acesso a qualquer `authenticated` sem `auth.uid()`. |
+| Ligar login anônimo no BANCO DE TESTE expor dados de outros apps (P4) | Alto | **Confirmado em 07/11/2026**: tabelas de outros apps no mesmo banco têm políticas abertas a usuários autenticados. | **Risco aceito** pelo Alexandre (07/11/2026): o app de livros é experimento sem usuários e será aposentado. O agente de código **não altera** objetos fora do prefixo `otcb_`. Regra para o futuro: nenhum app novo neste projeto cria política que libere acesso a qualquer `authenticated` sem `auth.uid()`. |
 | Usuário reinstala o app para ganhar limites novos de IA | Baixo | Baixa | Aceito; limite padrão do Supabase de criação de usuários anônimos por IP segura abuso em massa. |
 | Usuário perde Passaporte ao trocar de celular e reclama | Baixo | Média | Aviso fixo no Perfil (8.10); recuperação por telefone fica no roadmap (seção 28). |
 
@@ -1436,7 +1436,7 @@ Eventos (prefixo `otcb_`, sem texto de mensagem, sem localização, sem foto):
 | 24.10 | Fonte: Baloo 2 + Nunito (sugestão) | Gratuitas, arredondadas, combinam com a direção 16 | O Claude Design propõe outra |
 | 24.11 | Pesos e meias-vidas da regra 11.1 | Ponto de partida razoável; ajustáveis numa constante | Calibrar depois de 30 dias de dados |
 | 24.12 | Dados de jogos e garimpo agendados nos horários da seção 7.5 | Madrugada, fora do uso | Outros horários |
-| 24.14 | OTCB no BANCO DE TESTE com login anônimo ligado, sem corrigir as políticas das tabelas de outros apps | Sem custo novo; decisão do Alexandre | Projeto Supabase próprio, ou corrigir as políticas `livros_` e `precos_acoes` |
+| 24.14 | OTCB no BANCO DE TESTE com login anônimo ligado, sem corrigir as políticas das tabelas de outros apps | Sem custo novo; decisão do Alexandre | Projeto Supabase próprio, ou corrigir as políticas das tabelas dos outros apps |
 | 24.13 | Usuários anônimos abandonados (app desinstalado) não são limpos no MVP | Volume pequeno; simplicidade | Limpeza anual de usuários sem atividade há 12 meses |
 
 ---
