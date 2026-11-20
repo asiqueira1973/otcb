@@ -56,7 +56,7 @@ export function SealBadge({ selo, novo }: { selo: Selo; novo: boolean }) {
         <Text style={[styles.como, { color: theme.textMuted }]}>{copy.passport.sealHow[selo.selo]}</Text>
       </View>
       <Text style={[styles.progresso, { color: selo.conquistado ? palette.confirmed : theme.textMuted }]}>
-        {selo.conquistado && !(selo.selo === 'explorador' && selo.nivel !== 3) ? '✓' : copy.passport.progress(Math.min(selo.progresso, selo.meta), selo.meta)}
+        {selo.conquistado && (selo.nivel === undefined || selo.nivel === 3) ? '✓' : copy.passport.progress(Math.min(selo.progresso, selo.meta), selo.meta)}
       </Text>
     </View>
   );

@@ -167,7 +167,7 @@ describe('Passaporte', () => {
       Promise.resolve(nome === 'otcb_meu_passaporte' ? { data: DADOS, error: null } : { data: { dias: 1 }, error: null }));
     await renderWithSafeArea(<Passaporte />);
     await waitFor(() => expect(screen.getByTestId('compartilhar-passaporte')).toBeTruthy());
-    const imagem = JSON.stringify(screen.getByTestId('passport-share-card'));
+    const imagem = JSON.stringify(screen.getByTestId('passport-share-card', { includeHiddenElements: true }));
     expect(imagem).toContain('1 bar carimbado');
     expect(imagem).not.toMatch(/brahma|-23\.|-46\./i);
     const antes = mockRpc.mock.calls.filter((c) => c[0] === 'otcb_meu_passaporte').length;

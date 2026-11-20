@@ -1,4 +1,5 @@
 import { copy } from '../../lib/copy';
+import { faixaNota, notaTexto } from '../colarinhometro/nota';
 
 // Distância legível (16.4: comanda). Recebe: metros ou null. Devolve: "a 300 m", "a 1,3 km" ou null.
 export function formatDistance(m: number | null): string | null {
@@ -9,7 +10,12 @@ export function formatDistance(m: number | null): string | null {
 
 // Nota com uma casa e vírgula. Recebe: número. Devolve: "8,5".
 export function formatScore(n: number): string {
-  return n.toFixed(1).replace('.', ',');
+  return notaTexto(n);
+}
+
+// Colarinho médio do bar com faixa e número (8.12). Recebe: nota. Devolve: "Colarinho: Boa tirada (7,4)".
+export function formatCollar(n: number): string {
+  return copy.bar.collar(notaTexto(n), faixaNota(n));
 }
 
 // Data curta no fuso de SP. Recebe: ISO. Devolve: "07/11".

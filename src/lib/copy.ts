@@ -65,13 +65,14 @@ export const copy = {
   },
   bar: {
     // 16.4: pílulas de status e etiquetas
-    status: { confirmado: 'confirmado', provavel: 'provável', incerto: 'a confirmar' },
+    // 8.12: só dois rótulos na tela; "provável" aparece como "tem chopp Brahma" (a regra interna continua igual).
+    status: { confirmado: 'tem chopp Brahma', provavel: 'tem chopp Brahma', incerto: 'a confirmar' },
     counter: 'balcão',
     games: 'passa jogo',
     classic: 'clássico',
     distanceM: (m: number) => `a ${m} m`, // (proposto 8.4)
     distanceKm: (km: string) => `a ${km} km`, // (proposto 8.4)
-    collar: (n: string) => `Colarinho ${n}`, // (proposto 8.4)
+    collar: (n: string, faixa: string) => `Colarinho: ${faixa} (${n})`, // (proposto 8.12) faixa e número
     noCollar: 'Colarinho sem nota ainda', // (proposto 8.4)
     opinions: (n: number) => (n === 1 ? '1 opinião' : `${n} opiniões`), // (proposto 8.4)
     lastConfirmation: (d: string) => `Última confirmação em ${d}`, // (proposto 8.4)
@@ -135,10 +136,13 @@ export const copy = {
     hasBrahmaQuestion: 'Tem chopp Brahma?', // (proposto 8.5)
     dontKnow: 'Não sei', // tabela da 8.5
     suggest: 'Sugerir', // (proposto 8.5)
-    dontKnowNotice: 'Valeu! Aqui só entram bares com chopp Brahma. Se descobrir que tem, é só me contar.', // (proposto 8.5)
+    dontKnowNotice: 'Valeu! Cadastrei como a confirmar; quem passar lá confirma.', // (proposto 8.12)
     suggested: 'Bar sugerido! Ele entra como a confirmar.', // (proposto 8.5)
+    suggestedHere: 'Bar cadastrado e confirmado. Valeu!', // (proposto 8.12) sugerido estando no bar
+    suggestedStamp: 'Bar cadastrado e confirmado. O carimbo é seu!', // (proposto 8.12) a foto recente virou carimbo
     // 15.18
     alreadyExisted: 'Esse bar já estava aqui — sua confirmação foi registrada.',
+    alreadyExistedStamp: 'Esse bar já estava aqui: confirmação registrada e o carimbo é seu!', // (proposto 8.12)
     suggestionLimit: 'Por hoje já foram 5 sugestões. Amanhã tem mais.', // (proposto 8.5)
     addressNotFound: 'Não achei esse endereço. Confere e tenta de novo.', // (proposto 8.5)
     noLocation: 'Não consegui sua localização. Desmarca "Estou no bar agora" e escreve o endereço.', // (proposto 8.5)
@@ -172,11 +176,14 @@ export const copy = {
     partials: { altura: 'Altura', cremosidade: 'Cremosidade', copo: 'Copo', gelado: 'Gelado' }, // 11.5
     score: (n: string) => `Nota ${n}`, // (proposto 8.6) leitor de tela
     newStamp: 'Carimbo novo no Passaporte!', // (proposto 8.6)
-    noBar: 'Não achei bar por perto, então ficou sem carimbo. Conhece esse lugar?', // (proposto 8.6)
-    suggestBar: 'Sugerir este bar', // (proposto 8.6)
+    noBar: 'Não achei bar por perto, então ficou sem carimbo. Cadastra o bar que o carimbo é seu.', // (proposto 8.12)
+    suggestBar: 'Estou num bar que não está no app', // (proposto 8.12)
     notConfirmed: 'Sem confirmar Brahma, sem carimbo. A nota tá valendo!', // (proposto 8.6)
     alreadyStamped: 'Você já tem o carimbo deste bar.', // (proposto 8.6)
     share: 'Compartilhar', // passo 6 da 8.6
+    // Nota por faixa (8.12): a faixa em destaque, o número em segundo plano.
+    bands: { master: 'Tirada de mestre', good: 'Boa tirada', improve: 'Dá pra melhorar' },
+    shareTagline: 'Achei no OTCB · chopp bem tirado em SP', // (proposto 8.12) imagem de compartilhar
     photoLimit: 'Por hoje já foram 10 fotos. Amanhã tem mais.', // (proposto 8.6)
     queued: 'Sem sinal: a foto ficou guardada e vai assim que a rede voltar.', // (proposto 8.6)
     scoreSoon: 'Deu um branco na avaliação. A foto ficou guardada e a nota sai em instantes.', // 12.5 (proposto 8.6)
@@ -190,6 +197,8 @@ export const copy = {
     empty: 'Seu passaporte tá em branco. Tira a foto do próximo chopp e ganha o primeiro carimbo.',
     openCamera: 'Abrir o Colarinhômetro', // (proposto 8.7)
     stamped: (n: number) => (n === 1 ? '1 bar carimbado' : `${n} bares carimbados`), // (proposto 8.7)
+    share: 'Compartilhar', // (proposto 8.12)
+    shareTitle: 'Meu Passaporte do Chopp', // (proposto 8.12) imagem de compartilhar
     stamps: 'Carimbos', // (proposto 8.7)
     neighborhoods: 'Bairros', // (proposto 8.7)
     classics: 'Clássicos', // 11.11
@@ -205,10 +214,11 @@ export const copy = {
     // Descrições dos selos da 11.11 (proposto 8.7). Nenhuma fala em quantidade de chopp ou de fotos (princípio 3).
     sealHow: {
       primeira_tirada: 'Seu primeiro carimbo.',
-      explorador: 'Carimbos em bares diferentes.',
+      explorador: 'Carimbos em 3, 10 e 25 bares.', // (proposto 8.12)
       andarilho: 'Carimbos em 5 bairros.',
-      olho_clinico: 'Colarinho nota 9 ou mais em 5 bares.',
-      informante: 'Dicas que ajudaram a confirmar bares com chopp Brahma.',
+      olho_clinico: 'Colarinho nota 8 ou mais em 3 bares.', // (proposto 8.12)
+      informante: '10 ajudas: confirmar, sugerir bar ou opinar.', // (proposto 8.12)
+      divulgador: 'Compartilhe seu passaporte ou sua nota. Conta um por dia.', // (proposto 8.12)
     } as Record<string, string>,
   },
   // Nomes dos selos da regra 11.11 (proposto 8.4)
@@ -218,6 +228,7 @@ export const copy = {
     andarilho: 'Andarilho',
     olho_clinico: 'Olho clínico',
     informante: 'Informante',
+    divulgador: 'Divulgador', // (proposto 8.12)
   } as Record<string, string>,
   profile: {
     title: 'Perfil', // (proposto 8.4)

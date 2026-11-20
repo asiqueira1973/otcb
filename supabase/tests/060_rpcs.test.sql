@@ -53,9 +53,10 @@ select throws_ok($$ select public.otcb_confirmar_bar('00000000-0000-0000-0000-00
 select throws_ok($$ select public.otcb_confirmar_bar('00000000-0000-0000-0000-000000609999', 'tem_brahma', 'positivo') $$,
   'P0001', 'bar_inexistente', 'bar que não existe');
 
--- otcb_sugerir_bar: casamento (11.16) → confirmação no bar existente (copy 15.18)
+-- otcb_sugerir_bar: casamento (11.16) → confirmação no bar existente (copy 15.18). Desde o 8.12 a resposta também
+-- traz "carimbo" (se a foto recente sem bar virou carimbo); aqui não há foto.
 select is(public.otcb_sugerir_bar('Boteco Provavel', 'Rua 2', 'Vila Teste Sessenta', -13.001100, -43.000000, true),
-          jsonb_build_object('bar_id', '00000000-0000-0000-0000-000000600002', 'criado', false),
+          jsonb_build_object('bar_id', '00000000-0000-0000-0000-000000600002', 'criado', false, 'carimbo', false),
   '11.16: mesmo nome (sem acento/prefixo) a ~11 m casa com o bar existente');
 select throws_ok($$ select public.otcb_sugerir_bar('Boteco Provável', 'Rua 2', 'Vila Teste Sessenta', -13.001000, -43.000000, true) $$,
   'P0001', 'limite_confirmacao', 'sugestão que casa conta como confirmação e respeita o limite');

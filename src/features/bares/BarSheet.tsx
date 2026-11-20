@@ -11,7 +11,7 @@ import { minhaOpiniao, type MinhaOpiniao } from '../cards/api';
 import type { BlocoEntrada, CardBar } from '../chat/types';
 import { apelidoProprio, fetchBar, fetchOpinions, type Opiniao } from './api';
 import { barTags } from './BarCard';
-import { formatDistance, formatScore, formatShortDate } from './format';
+import { formatCollar, formatDistance, formatShortDate } from './format';
 import { openDirections } from './links';
 import { StatusPill, TagPill } from './Pill';
 
@@ -165,7 +165,7 @@ export function BarSheet({ visible, bar, failed, onClose, onCard }: Props) {
               {barTags(bar).map((t) => <TagPill key={t} label={t} />)}
             </View>
             <Text style={[styles.body, { color: theme.text }]}>
-              🍺 {bar.nota_colarinho_media !== null ? copy.bar.collar(formatScore(bar.nota_colarinho_media)) : copy.bar.noCollar}
+              🍺 {bar.nota_colarinho_media !== null ? formatCollar(bar.nota_colarinho_media) : copy.bar.noCollar}
             </Text>
             <Text style={[styles.meta, { color: theme.textMuted }]}>
               {bar.ultima_confirmacao_em ? copy.bar.lastConfirmation(formatShortDate(bar.ultima_confirmacao_em)) : copy.bar.noConfirmation}

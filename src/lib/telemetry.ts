@@ -13,7 +13,8 @@ export type TelemetryEvent =
   | 'otcb_selo_ganho'
   | 'otcb_ficha_aberta'
   | 'otcb_rota_aberta'
-  | 'otcb_conta_apagada';
+  | 'otcb_conta_apagada'
+  | 'otcb_compartilhou';
 
 type Prop = string | number | boolean;
 type Pending = { id: string; nome: TelemetryEvent; ocorrido_em: string; propriedades: Record<string, Prop> };
@@ -30,6 +31,7 @@ export const ALLOWED_PROPS: Record<TelemetryEvent, readonly string[]> = {
   otcb_ficha_aberta: ['status_bar'],
   otcb_rota_aberta: ['destino'],
   otcb_conta_apagada: [],
+  otcb_compartilhou: ['origem'], // 8.12: selo Divulgador
 };
 
 const FLUSH_MS = 3000;

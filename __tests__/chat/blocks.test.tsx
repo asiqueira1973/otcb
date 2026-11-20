@@ -31,7 +31,8 @@ describe('Blocos do chat', () => {
   it('lista_bares mostra cada bar com status, distância e etiquetas; incerto vira "a confirmar"', async () => {
     await renderBlocks([{ tipo: 'lista_bares', titulo: 'Perto de você', bares: [bar('a'), bar('b', { status: 'incerto', distancia_metros: 1340, tem_balcao: null })] }]);
     expect(screen.getByText('Perto de você')).toBeTruthy();
-    expect(screen.getByText('confirmado')).toBeTruthy();
+    // 8.12 (versão 1.0.2): confirmado e provável aparecem como "tem chopp Brahma" (antes "confirmado").
+    expect(screen.getByText('tem chopp Brahma')).toBeTruthy();
     expect(screen.getByText('a confirmar')).toBeTruthy();
     expect(screen.queryByText('incerto')).toBeNull();
     expect(screen.getByText('Pinheiros · a 300 m')).toBeTruthy();

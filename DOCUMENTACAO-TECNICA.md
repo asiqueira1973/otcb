@@ -16,7 +16,7 @@ Extensões usadas, liberadas pelo Alexandre: `pg_trgm`, `unaccent` e `pg_net` (n
 | `otcb_status_bar` | `confirmado`: tem chopp Brahma, com pontuação ≥ 1,0. `provavel`: ≥ 0,5. `incerto`: aparece como "a confirmar". `sem_brahma`: ≤ −0,5. `fechado`: o bar fechou. |
 | `otcb_assunto_evidencia` | Sobre o que é a evidência: se `tem_brahma`, se `transmite_jogos` ou o `funcionamento` do bar (aberto ou fechado). |
 | `otcb_sinal_evidencia` | `positivo` confirma, `negativo` nega, `fechado` diz que o bar fechou (só vale com `funcionamento`). |
-| `otcb_tipo_evidencia` | A fonte: `foto_colarinhometro`, `confirmacao_usuario`, `sugestao_usuario`, `cardapio_site`, `pagina_web`, `avaliacao_google`, `status_google` e `seed_otcb_antigo` (CSV antigo). `curadoria` (8.11): o dono do app atesta que o bar tem chopp. `sugestao_no_bar` (19/11/2026): bar sugerido por quem está nele. |
+| `otcb_tipo_evidencia` | A fonte: `foto_colarinhometro`, `confirmacao_usuario`, `sugestao_usuario`, `cardapio_site`, `pagina_web`, `avaliacao_google`, `status_google` e `seed_otcb_antigo` (CSV antigo). `curadoria` (8.11): o dono do app atesta que o bar tem chopp. `sugestao_no_bar` (19/11/2026): bar sugerido por quem está nele. `sugestao_sem_certeza` (8.12): bar sugerido com "Não sei". |
 | `otcb_origem_evidencia` | Quem trouxe a evidência: `usuario`, `garimpo` ou `seed`. |
 | `otcb_status_opiniao` | `publicada`, `oculta_moderacao` (recusada pela IA), `oculta_denuncias` (3 denúncias) ou `oculta_admin`. |
 | `otcb_papel_mensagem` | Autor da mensagem do chat: `usuario`, `assistente` ou `sistema` (registro de ação feita por card). |
@@ -130,12 +130,13 @@ Todas exigem `authenticated` e nunca aceitam `anon`.
 | RPC | Entrada → saída | Regras e erros |
 |---|---|---|
 | `otcb_confirmar_bar` | bar, assunto, sinal → `{ok: true}` | `bar_inexistente`, `sinal_invalido` (`funcionamento` só aceita `fechado`; os outros assuntos não aceitam `fechado`), `limite_confirmacao`. |
-| `otcb_sugerir_bar` | nome, endereço, bairro, lat, lng, tem_brahma, no_bar (opcional, padrão false) → `{bar_id, criado}` | Se casa com um bar existente (até 80 m e similaridade ≥ 0,5), grava uma confirmação nele e devolve `criado: false`. Se não casa, cria o bar mais a evidência `sugestao_usuario` (fica `incerto`) ou, com `no_bar`, `sugestao_no_bar` (fica confirmado). Nos dois casos liga a foto recente sem bar. Erros: `limite_sugestao` (5 por dia), `dados_invalidos` (inclusive bar novo com `tem_brahma = false`). |
+| `otcb_sugerir_bar` | nome, endereço, bairro, lat, lng, tem_brahma (nulo = "Não sei"), no_bar (opcional, padrão false) → `{bar_id, criado, carimbo}` | Se casa com um bar existente (até 80 m e similaridade ≥ 0,5), grava uma confirmação nele e devolve `criado: false`. Se não casa, cria o bar mais a evidência `sugestao_usuario` (fica `incerto`) ou, com `no_bar`, `sugestao_no_bar` (fica confirmado). Nos dois casos liga a foto recente sem bar (`carimbo` diz se virou carimbo). Com `tem_brahma` nulo, bar novo entra com `sugestao_sem_certeza` (peso 0) e bar existente não grava nada. Erros: `limite_sugestao` (5 por dia), `dados_invalidos` (inclusive bar novo com `tem_brahma = false`). |
 | `otcb_buscar_bares` | lat/lng, raio, texto, bairro, filtros → até 8 `CardBar` | Invoker (11.9). Só aparece bar não excluído, com status confirmado, provavel ou incerto e pontuação ≥ 0,1. Raio de 2 km por padrão, até 10 km. Ordena por status e depois por distância. Sem localização, exige texto ou bairro (`localizacao_ou_bairro_obrigatorio`). |
 | `otcb_agregados_confirmacao` | bar → última confirmação e pessoas distintas em 60 dias | Definer; devolve só números, sem dizer quem confirmou. Cada positiva anônima conta como uma pessoa (depois da anonimização resta no máximo uma por pessoa e bar). |
 | `otcb_detalhes_bar` | bar → `CardBar` | Definer; erro `bar_inexistente`. |
 | `otcb_opinioes_do_bar` (8.4) | bar, página → até 10 `{opiniao_id, apelido, nota, texto, criado_em}` | Definer; só opiniões `publicada` de bar não excluído, mais recentes primeiro. Expõe o apelido (seção 20) e nunca o id do autor. Usada pela Ficha e pelo agente. |
-| `otcb_meu_passaporte` | — → `{carimbos, colecoes_bairro, colecao_classicos, selos}` | Definer, sempre filtrado por `auth.uid()` (11.11). Os selos são Primeira tirada, Explorador (5, 15 e 30), Andarilho, Olho clínico e Informante. |
+| `otcb_meu_passaporte` | p_versao (padrão 1) → `{carimbos, colecoes_bairro, colecao_classicos, selos}` | Definer, sempre filtrado por `auth.uid()` (11.11). Os selos são Primeira tirada, Explorador (3, 10 e 25), Andarilho, Olho clínico (nota ≥ 8 em 3 bares) e Informante (10 contribuições); com `p_versao >= 2`, também o Divulgador (1, 5 e 15 dias com compartilhamento). |
+| `otcb_registrar_compartilhamento` | origem → `{dias}` | 8.12: registra um compartilhamento (na confiança), no máximo 10 por dia. Erros: `dados_invalidos`, `limite_compartilhamento`. |
 
 ### Políticas (6.1)
 
@@ -562,7 +563,23 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - **Informante:** 10 contribuições quaisquer (confirmação, sugestão de bar, opinião), sem esperar o bar ficar confirmado.
   - **Sugestão feita no bar:** `otcb_sugerir_bar` ganhou `p_no_bar boolean default false`. Com `true`, a evidência é `sugestao_no_bar` (peso 1,0, meia-vida 90, como a foto) e o bar novo já sai confirmado. O app 1.0.1 não manda o campo, então segue como antes; a próxima versão manda quando a pessoa disser que está no bar. O limite de 5 sugestões por dia conta os dois tipos.
 - **Testes:** pgTAP 161 (5 casos); 110, 120 e 060 atualizados com a regra nova escrita no comentário.
-- **Ainda no app (próxima versão):** enviar `p_no_bar`, e as descrições dos selos em `src/lib/copy.ts` (Olho clínico "nota 8 ou mais em 3 bares", Informante).
+- **No app:** feito na 1.0.2 (seção seguinte).
+
+### Versão 1.0.2 do app (8.12, 20/11/2026)
+- **Plano:** `plans/8.12-versao-1.0.2.md`. Migrations `20261120000100` (enum `sugestao_sem_certeza`) e `20261120000200`; pgTAP 170 (10 casos) e 171 (13 casos); Jest `__tests__/v102/versao-1-0-2.test.tsx`.
+- **Sugestão feita no bar:** o card manda `p_no_bar` quando "Estou no bar agora" está ligado; o bar novo sai confirmado. A RPC devolve também `carimbo` (a foto recente sem bar virou carimbo), e o card avisa "o carimbo é seu".
+- **"Não sei" cadastra:** `p_tem_brahma` nulo cria o bar com a evidência `sugestao_sem_certeza` (peso 0, meia-vida 60): fica "a confirmar" sem pontuar Brahma, conta no limite de 5 por dia e no Informante, e nunca liga foto. Nulo num bar existente não grava nada. O app 1.0.1 não manda nulo.
+- **Resultado da foto sem bar:** o botão vira "Estou num bar que não está no app" e abre a sugestão com a localização do momento.
+- **Status na tela:** confirmado e provável aparecem iguais, "tem chopp Brahma", na cor de confirmado (`copy.bar.status`, `Pill.tsx`, `MiniMap.tsx`); incerto segue "a confirmar". A regra interna não mudou.
+- **Nota por faixa:** `faixaNota` (`colarinhometro/nota.ts`): ≥ 8 "Tirada de mestre", ≥ 6 "Boa tirada", abaixo "Dá pra melhorar". Aparece logo abaixo do número no resultado, em destaque na imagem de compartilhar e na ficha ("Colarinho: Boa tirada (7,4)", `formatCollar`). `formatScore` passou a reutilizar `notaTexto`.
+- **Selo Divulgador:**
+  - **Tabela `otcb_compartilhamentos`:** só leitura dos próprios (política `otcb_compartilhamentos_le_proprios`), cascade com o perfil.
+  - **RPC `otcb_registrar_compartilhamento(p_origem)`:** origem `colarinho` ou `passaporte`, no máximo 10 por dia; devolve `{dias}`.
+  - **No app:** `compartilharImagem` (`src/features/compartilhar/compartilhar.ts`) captura a imagem, abre a folha do sistema e, quando ela fecha, registra na confiança (o sistema não diz se a pessoa postou) e dispara `otcb_compartilhou {origem}`.
+  - **Passaporte:** ganhou o botão "Compartilhar" e a `PassportShareCard` (Bolacha comemorando, bares carimbados e selos conquistados; sem apelido, localização, nomes de bar ou marca de cerveja). Depois de compartilhar, recarrega para animar o selo (A7).
+  - **Níveis:** 1, 5 e 15 dias diferentes com compartilhamento.
+- **Versão do contrato do Passaporte:** `otcb_meu_passaporte(p_versao integer default 1)`; o selo Divulgador só vem com `p_versao >= 2`, que a 1.0.2 manda. O 1.0.1 e o agente (que chama sem argumento) continuam com os 5 selos.
+- **Descrições dos selos** em `copy.ts` com as regras do Grupo 1, mais a do Divulgador.
 
 ### Foto sem bar ligada ao bar sugerido em seguida (19/11/2026)
 - **Caso real:** o Alexandre tirou a foto num bar que não estava no app (saiu sem carimbo, nota 7,9) e cadastrou o bar 2 minutos depois; a foto ficou solta e ele não ganhou o carimbo.
@@ -656,7 +673,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | `otcb_trg_foto_processa` também roda no update de `excluido_em` | A 7.5 fala só em insert. | A média da 11.5 é sobre fotos não excluídas. |
 | `otcb_meu_passaporte` como security definer | A 7.5 diz invoker. | O selo Informante lê as próprias evidências, que o RLS reserva ao admin; o filtro é `auth.uid()`. |
 | `otcb_agregados_confirmacao` e `otcb_bar_mais_proximo` | Funções novas. | Agregados do `CardBar` sem expor evidências (5.2); a regra 11.4 aplicada no banco para a Edge Function do 8.6. |
-| `otcb_sugerir_bar` | Bar novo com `tem_brahma = false` gera `dados_invalidos`; sugestão que casa vira confirmação. | A copy 15.18 diz "sua confirmação foi registrada"; sem Brahma não há o que cadastrar. Assim o limite de 5 por dia conta as evidências `sugestao_usuario` e `sugestao_no_bar`. |
+| `otcb_sugerir_bar` | Bar novo com `tem_brahma = false` gera `dados_invalidos`; sugestão que casa vira confirmação. | A copy 15.18 diz "sua confirmação foi registrada"; sem Brahma não há o que cadastrar. Assim o limite de 5 por dia conta as evidências `sugestao_usuario`, `sugestao_no_bar` e `sugestao_sem_certeza`. |
 | `otcb_detalhes_bar` | Devolve o status real (pode ser `sem_brahma` ou `fechado`). | A assinatura não traz contexto; o agente só mostra os visíveis da 11.9. |
 | Fechamento pelo Google | Interpretação literal: um `status_google` fechado só é anulado por foto ou confirmação positiva de usuário mais recente. | O spec não trata o Google voltar a dizer OPERATIONAL; ponto registrado no plano 8.2. |
 | CHECK `otcb_fotos_caminho_do_dono` | Restrição a mais. | Garante a pasta `{usuario_id}/` exigida pela 7.2 e pela política de storage. |
@@ -710,5 +727,6 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Numeração de build no EAS (8.11) | `appVersionSource: remote` em vez de local. | O `autoIncrement` não funciona com `app.config.ts` dinâmico e numeração local. |
 | Envio antes do teste em aparelho (8.11) | Os builds foram enviados para revisão antes do teste num iPhone e num Android físicos (critério 4 do 8.11); os dois apps já estão publicados (Apple 08/11, Play 10/11). | iPhone: testado pelo Alexandre em 08/11/2026 com o build de produção (TestFlight 1.0.0 (1)), tudo funcionando, inclusive o "Chamar Uber" (abre o Uber com o destino no bar e a origem na localização atual). Android: pendente (teste interno da Play). |
 | Fonte de jogos: API-Football no plano grátis (emenda do 8.11) | Troca do football-data.org (13.9 e premissa P2) pela API-Football. No plano grátis a janela é só hoje e amanhã, não 7 dias. | Decisão do Alexandre (08/11/2026) para cobrir Copa do Brasil, estaduais e Seleção. Efeito: o critério 2 do 8.9 ("oferece o próximo jogo dos 7 dias") fica limitado a amanhã até assinar o plano Pro (US$ 19/mês, pré-pago), que libera os 7 dias sem mudar o código. |
+| Versão 1.0.2 (8.12) | "Não sei" na sugestão cadastra o bar como a confirmar (a 8.5 dizia que não grava); status "provável" exibido como "tem chopp Brahma" (16.2/16.4 tinham três pílulas); nota mostrada por faixa; selo novo Divulgador fora da 11.11, com a tabela `otcb_compartilhamentos` fora da seção 7; `otcb_meu_passaporte` com `p_versao`. | Pedido do Alexandre: jogo mais simples e estímulo a compartilhar. |
 | Jogo mais simples (19/11/2026) | Carimbo a 300 m (11.4 diz 150 m); bairro com 2 carimbos, Explorador 3/10/25, Olho clínico ≥ 8,0 em 3 bares, Informante com qualquer contribuição (11.11); nova evidência `sugestao_no_bar` com peso 1,0 (11.1). | Decisão do Alexandre: o jogo tem que ser divertido e com menos regras. |
 | Agente do chat no Haiku (8.11) | `MODELO_AGENTE` = `claude-haiku-5-5`, não o `claude-sonnet-5-5` da seção 4.1. | Decisão do Alexandre (08/11/2026) por custo. Avaliação 26/26 (p50 3,7 s, p95 5,5 s, contra 4,9 s e 8,9 s com o Sonnet). Na troca, o Haiku esqueceu o card do Passaporte; o servidor passou a acrescentá-lo quando `meu_passaporte` é consultado (teste). Duas perguntas da avaliação foram corrigidas: o Bar Leo virou confirmado com a curadoria (o caso c4 usa agora o Bar Brahma Paulista, ainda a confirmar) e a expressão do caso ambev casava com "não sou da Ambev". |

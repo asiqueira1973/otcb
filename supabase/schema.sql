@@ -115,7 +115,8 @@ CREATE TYPE "public"."otcb_tipo_evidencia" AS ENUM (
     'status_google',
     'seed_otcb_antigo',
     'curadoria',
-    'sugestao_no_bar'
+    'sugestao_no_bar',
+    'sugestao_sem_certeza'
 );
 
 
@@ -968,7 +969,7 @@ $$;
 ALTER FUNCTION "public"."otcb_mensagens_hoje"("p_usuario" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."otcb_meu_passaporte"() RETURNS "jsonb"
+CREATE OR REPLACE FUNCTION "public"."otcb_meu_passaporte"("p_versao" integer DEFAULT 1) RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -981,6 +982,8 @@ declare
   v_qtd_bairros integer;
   v_olho integer;
   v_informante integer;
+  v_dias_compartilhou integer;
+  v_selos jsonb;
 begin
   select coalesce(jsonb_agg(jsonb_build_object('carimbo_id', c.id, 'bar_id', b.id, 'nome_bar', b.nome,
                                                'bairro', b.bairro, 'foto_id', c.foto_id, 'criado_em', c.criado_em)
@@ -1018,15 +1021,11 @@ begin
 
   -- Informante: contribuições quaisquer (confirmação, sugestão, opinião), sem depender do status do bar.
   select (select count(*)::integer from public.otcb_evidencias e
-           where e.usuario_id = v_uid and e.tipo in ('confirmacao_usuario', 'sugestao_usuario', 'sugestao_no_bar'))
+           where e.usuario_id = v_uid and e.tipo in ('confirmacao_usuario', 'sugestao_usuario', 'sugestao_no_bar', 'sugestao_sem_certeza'))
        + (select count(*)::integer from public.otcb_opinioes o where o.usuario_id = v_uid)
     into v_informante;
 
-  return jsonb_build_object(
-    'carimbos', v_carimbos,
-    'colecoes_bairro', v_bairros,
-    'colecao_classicos', v_classicos,
-    'selos', jsonb_build_array(
+  v_selos := jsonb_build_array(
       jsonb_build_object('selo', 'primeira_tirada', 'progresso', least(v_qtd_carimbos, 1), 'meta', 1,
                          'conquistado', v_qtd_carimbos >= 1),
       jsonb_build_object('selo', 'explorador', 'progresso', v_qtd_carimbos,
@@ -1037,13 +1036,30 @@ begin
       jsonb_build_object('selo', 'andarilho', 'progresso', v_qtd_bairros, 'meta', 5, 'conquistado', v_qtd_bairros >= 5),
       jsonb_build_object('selo', 'olho_clinico', 'progresso', v_olho, 'meta', 3, 'conquistado', v_olho >= 3),
       jsonb_build_object('selo', 'informante', 'progresso', v_informante, 'meta', 10, 'conquistado', v_informante >= 10)
-    )
+    );
+
+  -- Divulgador (8.12): dias diferentes em que a pessoa compartilhou a imagem do Passaporte ou da nota (na confiança).
+  if p_versao >= 2 then
+    select count(distinct public.otcb_dia_sp(c.criado_em))::integer into v_dias_compartilhou
+      from public.otcb_compartilhamentos c where c.usuario_id = v_uid;
+    v_selos := v_selos || jsonb_build_array(jsonb_build_object('selo', 'divulgador', 'progresso', v_dias_compartilhou,
+      'meta', case when v_dias_compartilhou < 1 then 1 when v_dias_compartilhou < 5 then 5 else 15 end,
+      'nivel', case when v_dias_compartilhou >= 15 then 3 when v_dias_compartilhou >= 5 then 2
+                    when v_dias_compartilhou >= 1 then 1 else 0 end,
+      'conquistado', v_dias_compartilhou >= 1));
+  end if;
+
+  return jsonb_build_object(
+    'carimbos', v_carimbos,
+    'colecoes_bairro', v_bairros,
+    'colecao_classicos', v_classicos,
+    'selos', v_selos
   );
 end;
 $$;
 
 
-ALTER FUNCTION "public"."otcb_meu_passaporte"() OWNER TO "postgres";
+ALTER FUNCTION "public"."otcb_meu_passaporte"("p_versao" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_normalizar"("p_texto" "text") RETURNS "text"
@@ -1303,6 +1319,32 @@ $$;
 ALTER FUNCTION "public"."otcb_registrar_card"("p_tipo" "text", "p_bar_id" "uuid", "p_resultado" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_registrar_compartilhamento"("p_origem" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_uid uuid := public.otcb_usuario_atual();
+  v_dias integer;
+begin
+  if p_origem is null or p_origem not in ('colarinho', 'passaporte') then
+    raise exception 'dados_invalidos' using errcode = 'P0001';
+  end if;
+  if (select count(*) from public.otcb_compartilhamentos c
+       where c.usuario_id = v_uid and public.otcb_dia_sp(c.criado_em) = public.otcb_hoje_sp()) >= 10 then
+    raise exception 'limite_compartilhamento' using errcode = 'P0001';
+  end if;
+  insert into public.otcb_compartilhamentos (usuario_id, origem) values (v_uid, p_origem);
+  select count(distinct public.otcb_dia_sp(c.criado_em))::integer into v_dias
+    from public.otcb_compartilhamentos c where c.usuario_id = v_uid;
+  return jsonb_build_object('dias', v_dias);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."otcb_registrar_compartilhamento"("p_origem" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1377,6 +1419,8 @@ begin
       peso := 1.2; meia_vida_dias := 36500;
     when p_tipo = 'sugestao_no_bar' and p_assunto = 'tem_brahma' and p_sinal = 'positivo' then
       peso := 1.0; meia_vida_dias := 90;
+    when p_tipo = 'sugestao_sem_certeza' and p_assunto = 'tem_brahma' and p_sinal = 'positivo' then
+      peso := 0; meia_vida_dias := 60;
     else
       raise exception 'evidencia_invalida' using errcode = '22023';
   end case;
@@ -1478,9 +1522,11 @@ declare
   v_endereco text := trim(coalesce(p_endereco, ''));
   v_bairro text := trim(coalesce(p_bairro, ''));
   v_bar uuid;
+  v_criado boolean := false;
+  v_tinha_carimbo boolean;
 begin
   if v_nome = '' or v_endereco = '' or v_bairro = '' or char_length(v_nome) > 120
-     or char_length(v_endereco) > 200 or char_length(v_bairro) > 80 or p_tem_brahma is null
+     or char_length(v_endereco) > 200 or char_length(v_bairro) > 80
      or p_latitude is null or p_longitude is null
      or p_latitude not between -90 and 90 or p_longitude not between -180 and 180 then
     raise exception 'dados_invalidos' using errcode = 'P0001';
@@ -1489,34 +1535,43 @@ begin
   v_bar := public.otcb_casar_bar(v_nome, p_latitude, p_longitude);
 
   if v_bar is not null then
+    if p_tem_brahma is null then
+      return jsonb_build_object('bar_id', v_bar, 'criado', false, 'carimbo', false);
+    end if;
     perform public.otcb_inserir_confirmacao(v_uid, v_bar, 'tem_brahma',
                                             case when p_tem_brahma then 'positivo' else 'negativo' end::public.otcb_sinal_evidencia);
-    if p_tem_brahma then perform public.otcb_ligar_foto_recente(v_uid, v_bar); end if;
-    return jsonb_build_object('bar_id', v_bar, 'criado', false);
+  else
+    if p_tem_brahma is false then
+      raise exception 'dados_invalidos' using errcode = 'P0001';
+    end if;
+
+    if (select count(*) from public.otcb_evidencias e
+         where e.usuario_id = v_uid and e.tipo in ('sugestao_usuario', 'sugestao_no_bar', 'sugestao_sem_certeza')
+           and public.otcb_dia_sp(e.data_evidencia) = public.otcb_hoje_sp()) >= 5 then
+      raise exception 'limite_sugestao' using errcode = 'P0001';
+    end if;
+
+    insert into public.otcb_bares (nome, endereco, bairro, latitude, longitude)
+    values (v_nome, v_endereco, v_bairro, round(p_latitude::numeric, 6), round(p_longitude::numeric, 6))
+    returning id into v_bar;
+    v_criado := true;
+
+    -- Sugestão feita estando no bar (p_no_bar) vale como prova forte: o bar sai confirmado. "Não sei" não pontua.
+    insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, usuario_id, data_evidencia, peso, meia_vida_dias)
+    values (v_bar, 'tem_brahma', 'positivo',
+            case when p_tem_brahma is null then 'sugestao_sem_certeza'
+                 when p_no_bar then 'sugestao_no_bar' else 'sugestao_usuario' end::public.otcb_tipo_evidencia,
+            'usuario', v_uid, now(), 0, 1);
   end if;
 
-  if not p_tem_brahma then
-    raise exception 'dados_invalidos' using errcode = 'P0001';
+  if p_tem_brahma is not true then
+    return jsonb_build_object('bar_id', v_bar, 'criado', v_criado, 'carimbo', false);
   end if;
 
-  if (select count(*) from public.otcb_evidencias e
-       where e.usuario_id = v_uid and e.tipo in ('sugestao_usuario', 'sugestao_no_bar')
-         and public.otcb_dia_sp(e.data_evidencia) = public.otcb_hoje_sp()) >= 5 then
-    raise exception 'limite_sugestao' using errcode = 'P0001';
-  end if;
-
-  insert into public.otcb_bares (nome, endereco, bairro, latitude, longitude)
-  values (v_nome, v_endereco, v_bairro, round(p_latitude::numeric, 6), round(p_longitude::numeric, 6))
-  returning id into v_bar;
-
-  -- Sugestão feita estando no bar (p_no_bar, coordenadas do celular) vale como prova forte: o bar sai confirmado.
-  insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, usuario_id, data_evidencia, peso, meia_vida_dias)
-  values (v_bar, 'tem_brahma', 'positivo',
-          case when p_no_bar then 'sugestao_no_bar' else 'sugestao_usuario' end::public.otcb_tipo_evidencia,
-          'usuario', v_uid, now(), 0, 1);
-
+  v_tinha_carimbo := exists (select 1 from public.otcb_carimbos c where c.usuario_id = v_uid and c.bar_id = v_bar);
   perform public.otcb_ligar_foto_recente(v_uid, v_bar);
-  return jsonb_build_object('bar_id', v_bar, 'criado', true);
+  return jsonb_build_object('bar_id', v_bar, 'criado', v_criado,
+    'carimbo', not v_tinha_carimbo and exists (select 1 from public.otcb_carimbos c where c.usuario_id = v_uid and c.bar_id = v_bar));
 end;
 $$;
 
@@ -1625,6 +1680,18 @@ CREATE TABLE IF NOT EXISTS "public"."otcb_carimbos" (
 
 
 ALTER TABLE "public"."otcb_carimbos" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."otcb_compartilhamentos" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "usuario_id" "uuid" NOT NULL,
+    "origem" "text" NOT NULL,
+    "criado_em" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "otcb_compartilhamentos_origem_check" CHECK (("origem" = ANY (ARRAY['colarinho'::"text", 'passaporte'::"text"])))
+);
+
+
+ALTER TABLE "public"."otcb_compartilhamentos" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."otcb_denuncias" (
@@ -1811,6 +1878,11 @@ ALTER TABLE ONLY "public"."otcb_carimbos"
 
 
 
+ALTER TABLE ONLY "public"."otcb_compartilhamentos"
+    ADD CONSTRAINT "otcb_compartilhamentos_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."otcb_denuncias"
     ADD CONSTRAINT "otcb_denuncias_opiniao_usuario_unico" UNIQUE ("opiniao_id", "usuario_id");
 
@@ -1883,6 +1955,10 @@ CREATE INDEX "otcb_carimbos_bar_idx" ON "public"."otcb_carimbos" USING "btree" (
 
 
 CREATE INDEX "otcb_carimbos_foto_idx" ON "public"."otcb_carimbos" USING "btree" ("foto_id") WHERE ("foto_id" IS NOT NULL);
+
+
+
+CREATE INDEX "otcb_compartilhamentos_usuario_idx" ON "public"."otcb_compartilhamentos" USING "btree" ("usuario_id", "criado_em");
 
 
 
@@ -1989,6 +2065,11 @@ ALTER TABLE ONLY "public"."otcb_carimbos"
 
 
 
+ALTER TABLE ONLY "public"."otcb_compartilhamentos"
+    ADD CONSTRAINT "otcb_compartilhamentos_usuario_id_fkey" FOREIGN KEY ("usuario_id") REFERENCES "public"."otcb_perfis"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."otcb_denuncias"
     ADD CONSTRAINT "otcb_denuncias_opiniao_id_fkey" FOREIGN KEY ("opiniao_id") REFERENCES "public"."otcb_opinioes"("id") ON DELETE CASCADE;
 
@@ -2063,6 +2144,13 @@ CREATE POLICY "otcb_carimbos_admin_le" ON "public"."otcb_carimbos" FOR SELECT TO
 
 
 CREATE POLICY "otcb_carimbos_le_proprios" ON "public"."otcb_carimbos" FOR SELECT TO "authenticated" USING (("usuario_id" = ( SELECT "auth"."uid"() AS "uid")));
+
+
+
+ALTER TABLE "public"."otcb_compartilhamentos" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "otcb_compartilhamentos_le_proprios" ON "public"."otcb_compartilhamentos" FOR SELECT TO "authenticated" USING (("usuario_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -2375,9 +2463,9 @@ GRANT ALL ON FUNCTION "public"."otcb_mensagens_hoje"("p_usuario" "uuid") TO "ser
 
 
 
-REVOKE ALL ON FUNCTION "public"."otcb_meu_passaporte"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."otcb_meu_passaporte"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."otcb_meu_passaporte"() TO "service_role";
+REVOKE ALL ON FUNCTION "public"."otcb_meu_passaporte"("p_versao" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_meu_passaporte"("p_versao" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."otcb_meu_passaporte"("p_versao" integer) TO "service_role";
 
 
 
@@ -2430,6 +2518,12 @@ GRANT ALL ON FUNCTION "public"."otcb_registrar_card"("p_tipo" "text", "p_bar_id"
 
 
 
+REVOKE ALL ON FUNCTION "public"."otcb_registrar_compartilhamento"("p_origem" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_registrar_compartilhamento"("p_origem" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."otcb_registrar_compartilhamento"("p_origem" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_registrar_evidencia_garimpo"("p_bar_id" "uuid", "p_assunto" "public"."otcb_assunto_evidencia", "p_sinal" "public"."otcb_sinal_evidencia", "p_tipo" "public"."otcb_tipo_evidencia", "p_url_fonte" "text", "p_trecho" "text", "p_data_evidencia" timestamp with time zone) TO "service_role";
 
@@ -2474,6 +2568,11 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."otcb_bares" TO "authenticat
 
 GRANT ALL ON TABLE "public"."otcb_carimbos" TO "service_role";
 GRANT SELECT ON TABLE "public"."otcb_carimbos" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."otcb_compartilhamentos" TO "service_role";
+GRANT SELECT ON TABLE "public"."otcb_compartilhamentos" TO "authenticated";
 
 
 

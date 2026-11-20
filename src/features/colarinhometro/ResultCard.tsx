@@ -1,15 +1,14 @@
 import * as Haptics from 'expo-haptics';
-import * as Sharing from 'expo-sharing';
 import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSequence, withSpring, withTiming } from 'react-native-reanimated';
-import { captureRef } from 'react-native-view-shot';
 
 import { Button } from '../../components/Button';
 import { fonts, palette, useTheme } from '../../components/theme';
 import { copy } from '../../lib/copy';
 import type { BlocoEntrada, ResultadoColarinho } from '../chat/types';
-import { notaTexto } from './nota';
+import { compartilharImagem } from '../compartilhar/compartilhar';
+import { faixaNota, notaTexto } from './nota';
 import { ShareCard } from './ShareCard';
 
 type Props = { bloco: ResultadoColarinho; animar: boolean; onCard?: (b: BlocoEntrada) => void };
@@ -92,12 +91,7 @@ export function ResultCard({ bloco, animar, onCard }: Props) {
   const estiloCard = useAnimatedStyle(() => ({ transform: [{ translateX: tremida.value }] }));
 
   async function compartilhar() {
-    try {
-      const uri = await captureRef(shareRef as unknown as Parameters<typeof captureRef>[0], { format: 'png', quality: 1 });
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'image/png' });
-    } catch {
-      // o compartilhamento é opcional; falha silenciosa
-    }
+    await compartilharImagem(shareRef, 'colarinho');
   }
 
   return (
@@ -107,6 +101,7 @@ export function ResultCard({ bloco, animar, onCard }: Props) {
       <Text accessible accessibilityLabel={copy.colarinho.score(notaTexto(bloco.nota_colarinho))} style={[styles.nota, { color: theme.primary }]}>
         {notaTexto(mostrada)}
       </Text>
+      <Text style={[styles.faixa, { color: theme.text }]}>{faixaNota(bloco.nota_colarinho)}</Text>
       {PARCIAIS.map((k, i) => (
         <Barra key={k} rotulo={copy.colarinho.partials[k]} nota={bloco[`nota_${k}`]} ordem={i} animar={anima} />
       ))}
@@ -163,6 +158,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.title, fontSize: 24, letterSpacing: 0.5 },
   bar: { fontFamily: fonts.body, fontSize: 15 },
   nota: { fontFamily: fonts.title, fontSize: 72, lineHeight: 76, alignSelf: 'center' },
+  faixa: { fontFamily: fonts.title, fontSize: 30, letterSpacing: 0.5, alignSelf: 'center', marginTop: -4 },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   barLabel: { fontFamily: fonts.body, fontSize: 14, width: 96 },
   barTrack: { flex: 1, height: 10, borderRadius: 5, overflow: 'hidden' },

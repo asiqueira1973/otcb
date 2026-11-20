@@ -6,11 +6,12 @@ import type { BarStatus } from '../chat/types';
 
 const STATUS_COLOR: Record<BarStatus, string> = {
   confirmado: palette.confirmed,
-  provavel: palette.probable,
+  provavel: palette.confirmed, // 8.12: provável aparece igual a confirmado
   incerto: palette.unconfirmed,
 };
 
-// Pílula de status (16.2 semântica; critério 4 do 8.4: incerto aparece como "a confirmar").
+// Pílula de status (16.2 semântica; critério 4 do 8.4: incerto aparece como "a confirmar"; 8.12: confirmado e
+// provável aparecem iguais, "tem chopp Brahma").
 // Recebe: status. Devolve: a pílula colorida com texto (a cor nunca é a única informação, seção 17).
 export function StatusPill({ status }: { status: BarStatus }) {
   return (

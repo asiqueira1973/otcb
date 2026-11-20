@@ -7,7 +7,8 @@ import type { Bloco } from '../chat/types';
 
 type Ponto = Extract<Bloco, { tipo: 'mapa' }>['pontos'][number];
 
-const COLOR = { confirmado: palette.confirmed, provavel: palette.probable, incerto: palette.unconfirmed } as const;
+// 8.12: provável com a cor de confirmado (dois estados na tela).
+const COLOR = { confirmado: palette.confirmed, provavel: palette.confirmed, incerto: palette.unconfirmed } as const;
 
 // Região que enquadra todos os pontos com folga. Recebe: pontos. Devolve: região do MapView.
 export function regionFor(pontos: Ponto[]) {

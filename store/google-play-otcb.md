@@ -53,6 +53,10 @@ Não coletados: informações pessoais (nome, e-mail, telefone), financeiras, sa
 
 - Só Brasil (decisão do Alexandre, 8.11).
 
+## Versão 1.0.2
+
+- **Notas da versão (≤500):** Ficou mais fácil ganhar carimbos e selos. Cadastrou um bar estando nele? Ele já entra confirmado e o carimbo é seu. A nota do colarinho agora vem por faixa, e tem selo novo: Divulgador, para quem compartilha o passaporte ou a nota.
+
 ## Primeira versão
 
 - **Faixa:** teste interno primeiro (`eas submit` com `track: internal`, `releaseStatus: draft`), depois produção.

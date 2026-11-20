@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { fonts, useTheme } from '../../components/theme';
 import { copy } from '../../lib/copy';
 import type { CardBar } from '../chat/types';
-import { formatDistance, formatScore } from './format';
+import { formatCollar, formatDistance } from './format';
 import { StatusPill, TagPill } from './Pill';
 
 type Props = { bar: CardBar; onOpen: (bar: CardBar) => void; compact?: boolean };
@@ -23,7 +23,7 @@ export function barTags(bar: Pick<CardBar, 'tem_balcao' | 'transmite_jogos' | 'c
 export function BarCard({ bar, onOpen, compact }: Props) {
   const theme = useTheme();
   const distance = formatDistance(bar.distancia_metros);
-  const collar = bar.nota_colarinho_media !== null ? copy.bar.collar(formatScore(bar.nota_colarinho_media)) : copy.bar.noCollar;
+  const collar = bar.nota_colarinho_media !== null ? formatCollar(bar.nota_colarinho_media) : copy.bar.noCollar;
   const tags = barTags(bar);
   const a11y = [bar.nome, copy.bar.status[bar.status], bar.bairro, distance, ...tags, collar].filter(Boolean).join(', ');
 

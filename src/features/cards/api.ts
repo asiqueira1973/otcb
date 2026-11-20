@@ -46,17 +46,23 @@ export async function confirmar(barId: string, assunto: Assunto, sinal: 'positiv
   return { ok: true, valor: undefined };
 }
 
-// formulario_sugestao_bar → otcb_sugerir_bar (11.16; 15.18). Recebe: dados e coordenadas.
-// Devolve: { criado } (false = casou com bar existente) ou falha.
-export async function sugerir(d: { nome: string; endereco: string; bairro: string; latitude: number; longitude: number }): Promise<Resultado<{ criado: boolean }>> {
+// formulario_sugestao_bar → otcb_sugerir_bar (11.16; 15.18; 8.12). Recebe: dados, coordenadas, temBrahma (true ou
+// null = "Não sei", que cadastra como a confirmar) e noBar (a pessoa está no bar: o bar novo já sai confirmado).
+// Devolve: { criado (false = casou com bar existente), carimbo (a foto recente virou carimbo) } ou falha.
+export async function sugerir(d: {
+  nome: string; endereco: string; bairro: string; latitude: number; longitude: number; temBrahma: true | null; noBar: boolean;
+}): Promise<Resultado<{ criado: boolean; carimbo: boolean }>> {
   try {
     const { data, error } = await supabase.rpc('otcb_sugerir_bar', {
-      p_nome: d.nome, p_endereco: d.endereco, p_bairro: d.bairro, p_latitude: d.latitude, p_longitude: d.longitude, p_tem_brahma: true,
+      p_nome: d.nome, p_endereco: d.endereco, p_bairro: d.bairro, p_latitude: d.latitude, p_longitude: d.longitude,
+      // "Não sei" vai como nulo (o tipo gerado não aceita null em argumento boolean).
+      p_tem_brahma: d.temBrahma as boolean, p_no_bar: d.noBar,
     });
     if (error) return { ok: false, falha: traduzirErro(error.message, error.code) };
-    const r = data as unknown as { bar_id: string; criado: boolean };
-    void registrarCard('sugestao', r.bar_id, r.criado ? 'criado' : 'ja_existia');
-    return { ok: true, valor: { criado: r.criado } };
+    const r = data as unknown as { bar_id: string; criado: boolean; carimbo?: boolean };
+    // "Não sei" num bar que já existia não grava nada; não há o que registrar no histórico.
+    if (d.temBrahma || r.criado) void registrarCard('sugestao', r.bar_id, r.criado ? 'criado' : 'ja_existia');
+    return { ok: true, valor: { criado: r.criado, carimbo: r.carimbo === true } };
   } catch (e) {
     return { ok: false, falha: traduzirErro(e instanceof Error ? e.message : '') };
   }

@@ -51,6 +51,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"otcb_compartilhamentos": {
+                  Row: {
+                    "criado_em": string,"id": string,"origem": string,"usuario_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "criado_em"?: string,"id"?: string,"origem": string,"usuario_id": string
+                  }
+                  Update: {
+                    "criado_em"?: string,"id"?: string,"origem"?: string,"usuario_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "otcb_compartilhamentos_usuario_id_fkey"
+      columns: ["usuario_id"]
+isOneToOne: false
+      referencedRelation: "otcb_perfis"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"otcb_denuncias": {
                   Row: {
                     "criado_em": string,"id": string,"motivo": string | null,"opiniao_id": string,"usuario_id": string
@@ -346,7 +366,7 @@ isOneToOne: false
 { Args: { "p_usuario": string }; Returns: number
                            },
 "otcb_meu_passaporte":
-{ Args: Record<PropertyKey, never>; Returns: Json
+{ Args: { "p_versao"?: number }; Returns: Json
                            },
 "otcb_normalizar":
 { Args: { "p_texto": string }; Returns: string
@@ -367,6 +387,9 @@ isOneToOne: false
                            },
 "otcb_registrar_card":
 { Args: { "p_bar_id": string,"p_resultado": string,"p_tipo": string }; Returns: string
+                           },
+"otcb_registrar_compartilhamento":
+{ Args: { "p_origem": string }; Returns: Json
                            },
 "otcb_registrar_evidencia_garimpo":
 { Args: { "p_assunto": Database["public"]['Enums']["otcb_assunto_evidencia"],"p_bar_id": string,"p_data_evidencia": string,"p_sinal": Database["public"]['Enums']["otcb_sinal_evidencia"],"p_tipo": Database["public"]['Enums']["otcb_tipo_evidencia"],"p_trecho": string,"p_url_fonte": string }; Returns: string
@@ -391,7 +414,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "otcb_assunto_evidencia": "tem_brahma"|"transmite_jogos"|"funcionamento","otcb_origem_evidencia": "usuario"|"garimpo"|"seed","otcb_papel": "usuario"|"admin","otcb_papel_mensagem": "usuario"|"assistente"|"sistema","otcb_sinal_evidencia": "positivo"|"negativo"|"fechado","otcb_status_bar": "confirmado"|"provavel"|"incerto"|"sem_brahma"|"fechado","otcb_status_execucao": "em_andamento"|"concluida"|"falhou","otcb_status_opiniao": "publicada"|"oculta_moderacao"|"oculta_denuncias"|"oculta_admin","otcb_tipo_evidencia": "foto_colarinhometro"|"confirmacao_usuario"|"sugestao_usuario"|"cardapio_site"|"pagina_web"|"avaliacao_google"|"status_google"|"seed_otcb_antigo"|"curadoria"|"sugestao_no_bar","otcb_tipo_execucao": "descoberta"|"revisita"|"coordenadas"|"resumos"|"jogos"
+            "otcb_assunto_evidencia": "tem_brahma"|"transmite_jogos"|"funcionamento","otcb_origem_evidencia": "usuario"|"garimpo"|"seed","otcb_papel": "usuario"|"admin","otcb_papel_mensagem": "usuario"|"assistente"|"sistema","otcb_sinal_evidencia": "positivo"|"negativo"|"fechado","otcb_status_bar": "confirmado"|"provavel"|"incerto"|"sem_brahma"|"fechado","otcb_status_execucao": "em_andamento"|"concluida"|"falhou","otcb_status_opiniao": "publicada"|"oculta_moderacao"|"oculta_denuncias"|"oculta_admin","otcb_tipo_evidencia": "foto_colarinhometro"|"confirmacao_usuario"|"sugestao_usuario"|"cardapio_site"|"pagina_web"|"avaliacao_google"|"status_google"|"seed_otcb_antigo"|"curadoria"|"sugestao_no_bar"|"sugestao_sem_certeza","otcb_tipo_execucao": "descoberta"|"revisita"|"coordenadas"|"resumos"|"jogos"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -507,7 +530,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "otcb_assunto_evidencia": ["tem_brahma", "transmite_jogos", "funcionamento"],"otcb_origem_evidencia": ["usuario", "garimpo", "seed"],"otcb_papel": ["usuario", "admin"],"otcb_papel_mensagem": ["usuario", "assistente", "sistema"],"otcb_sinal_evidencia": ["positivo", "negativo", "fechado"],"otcb_status_bar": ["confirmado", "provavel", "incerto", "sem_brahma", "fechado"],"otcb_status_execucao": ["em_andamento", "concluida", "falhou"],"otcb_status_opiniao": ["publicada", "oculta_moderacao", "oculta_denuncias", "oculta_admin"],"otcb_tipo_evidencia": ["foto_colarinhometro", "confirmacao_usuario", "sugestao_usuario", "cardapio_site", "pagina_web", "avaliacao_google", "status_google", "seed_otcb_antigo", "curadoria", "sugestao_no_bar"],"otcb_tipo_execucao": ["descoberta", "revisita", "coordenadas", "resumos", "jogos"]
+            "otcb_assunto_evidencia": ["tem_brahma", "transmite_jogos", "funcionamento"],"otcb_origem_evidencia": ["usuario", "garimpo", "seed"],"otcb_papel": ["usuario", "admin"],"otcb_papel_mensagem": ["usuario", "assistente", "sistema"],"otcb_sinal_evidencia": ["positivo", "negativo", "fechado"],"otcb_status_bar": ["confirmado", "provavel", "incerto", "sem_brahma", "fechado"],"otcb_status_execucao": ["em_andamento", "concluida", "falhou"],"otcb_status_opiniao": ["publicada", "oculta_moderacao", "oculta_denuncias", "oculta_admin"],"otcb_tipo_evidencia": ["foto_colarinhometro", "confirmacao_usuario", "sugestao_usuario", "cardapio_site", "pagina_web", "avaliacao_google", "status_google", "seed_otcb_antigo", "curadoria", "sugestao_no_bar", "sugestao_sem_certeza"],"otcb_tipo_execucao": ["descoberta", "revisita", "coordenadas", "resumos", "jogos"]
           }
         }
 } as const

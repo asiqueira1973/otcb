@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +10,9 @@ import { fonts, palette, useTheme } from '../src/components/theme';
 import { BarSheetProvider, useBarSheet } from '../src/features/bares/BarSheet';
 import { guardarLocal } from '../src/features/chat/localMessages';
 import type { BlocoEntrada } from '../src/features/chat/types';
+import { compartilharImagem } from '../src/features/compartilhar/compartilhar';
 import { carregarPassaporte, type Passaporte as Dados, selosNovos } from '../src/features/passaporte/api';
+import { PassportShareCard } from '../src/features/passaporte/PassportShareCard';
 import { SealBadge } from '../src/features/passaporte/SealBadge';
 import { Stamp } from '../src/features/passaporte/Stamp';
 import { copy } from '../src/lib/copy';
@@ -18,7 +20,8 @@ import { copy } from '../src/lib/copy';
 // T8 — Passaporte do Chopp (épico 8.7; regra 11.11). Mostra só o que otcb_meu_passaporte devolve: bares
 // carimbados, grade de carimbos (tocar abre a Ficha), coleções por bairro, Clássicos (só com curadoria, 25.5)
 // e selos (A7 no selo novo). Puxar para atualizar mostra a Bolacha girando (A11). Vazio → 15.5. Nenhum número
-// conta chopp ou fotos (princípio 3). Sem rede, mostra o último carregado. Recebe: nada. Devolve: a tela.
+// conta chopp ou fotos (princípio 3). Sem rede, mostra o último carregado. 8.12: "Compartilhar" gera a imagem do
+// Passaporte, registra o compartilhamento (selo Divulgador) e recarrega para animar o selo. Recebe: nada. Devolve: a tela.
 export default function PassaporteScreen() {
   // Cards da Ficha aberta daqui (Dar opinião, Tem Brahma?) voltam para o chat, guardados no aparelho.
   const onCard = useCallback((b: BlocoEntrada) => {
@@ -43,6 +46,7 @@ function Conteudo() {
   const [carregando, setCarregando] = useState(true);
   const [novos, setNovos] = useState<string[]>([]);
   const [falhou, setFalhou] = useState(false);
+  const shareRef = useRef<ComponentRef<typeof View>>(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -55,6 +59,11 @@ function Conteudo() {
     }
     setCarregando(false);
   }, []);
+
+  // Compartilhar (8.12): na volta da folha do sistema, recarrega para o selo Divulgador aparecer e animar (A7).
+  const compartilhar = useCallback(async () => {
+    if (await compartilharImagem(shareRef, 'passaporte')) await carregar();
+  }, [carregar]);
 
   useEffect(() => {
     void carregar(); // eslint-disable-line react-hooks/set-state-in-effect -- carga inicial da tela
@@ -95,6 +104,11 @@ function Conteudo() {
         {dados && !vazio ? (
           <>
             <Text testID="total-carimbados" style={[styles.total, { color: theme.text }]}>{copy.passport.stamped(dados.carimbos.length)}</Text>
+            <Button testID="compartilhar-passaporte" label={copy.passport.share} onPress={() => void compartilhar()} />
+            {/* Imagem de compartilhar fora da tela, escondida do leitor de tela. */}
+            <View style={styles.offscreen} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <PassportShareCard ref={shareRef} dados={dados} />
+            </View>
 
             <Text accessibilityRole="header" style={[styles.secao, { color: theme.text }]}>{copy.passport.stamps}</Text>
             <View style={styles.grade}>
@@ -174,4 +188,5 @@ const styles = StyleSheet.create({
   preenchido: { height: 10, borderRadius: 5 },
   novo: { fontFamily: fonts.bodyBold, fontSize: 16 },
   girando: { alignSelf: 'center', marginVertical: 8 },
+  offscreen: { position: 'absolute', left: -10000, top: 0 },
 });

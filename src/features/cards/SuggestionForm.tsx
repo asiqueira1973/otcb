@@ -26,9 +26,19 @@ export async function coordenadasDaSugestao(estouNoBar: boolean, endereco: strin
   }
 }
 
+// Texto do card depois da sugestão (8.12). Recebe: se respondeu "Tem sim", se estava no bar e a resposta da RPC.
+// Devolve: "Não sei" → cadastrado como a confirmar; carimbo ganho; confirmado (no bar); a confirmar; ou 15.18.
+export function mensagemDaSugestao(temBrahma: boolean, noBar: boolean, r: { criado: boolean; carimbo: boolean }): string {
+  if (!temBrahma) return copy.cards.dontKnowNotice;
+  if (!r.criado) return r.carimbo ? copy.cards.alreadyExistedStamp : copy.cards.alreadyExisted;
+  if (r.carimbo) return copy.cards.suggestedStamp;
+  return noBar ? copy.cards.suggestedHere : copy.cards.suggested;
+}
+
 // Card formulario_sugestao_bar (8.5; 13.2): nome, endereço, bairro, "Estou no bar agora" e "Tem chopp
-// Brahma?" (Tem sim / Não sei). "Não sei" não grava nada (decisão do Alexandre, plano 8.5). "Tem sim"
-// chama otcb_sugerir_bar: bar a até 80 m com nome parecido não é criado e o card mostra 15.18 (critério 6).
+// Brahma?" (Tem sim / Não sei). Chama otcb_sugerir_bar: bar a até 80 m com nome parecido não é criado e o card
+// mostra 15.18 (critério 6). 8.12: estando no bar, o bar novo já sai confirmado (p_no_bar); "Não sei" cadastra
+// como a confirmar (antes não gravava nada).
 // Recebe: chave e o que o agente pré-preencheu. Devolve: o card.
 export function SuggestionForm({ chave, nome, endereco, bairro, usarLocalizacaoAtual }: Props) {
   const theme = useTheme();
@@ -41,13 +51,15 @@ export function SuggestionForm({ chave, nome, endereco, bairro, usarLocalizacaoA
 
   function enviarSugestao() {
     void enviar(async () => {
-      if (temBrahma === 'nao_sei') return { fase: 'aviso', mensagem: copy.cards.dontKnowNotice };
       const coords = await coordenadasDaSugestao(estouNoBar, campos.endereco.trim(), campos.bairro.trim());
       if (!coords) return { fase: 'erro', mensagem: estouNoBar ? copy.cards.noLocation : copy.cards.addressNotFound };
-      const r = await sugerir({ nome: campos.nome.trim(), endereco: campos.endereco.trim(), bairro: campos.bairro.trim(), ...coords });
+      const r = await sugerir({
+        nome: campos.nome.trim(), endereco: campos.endereco.trim(), bairro: campos.bairro.trim(), ...coords,
+        temBrahma: temBrahma === 'sim' ? true : null, noBar: estouNoBar,
+      });
       if (r.ok) {
         track('otcb_card_registrado', { tipo_card: 'formulario_sugestao_bar' });
-        return { fase: 'registrado', mensagem: r.valor.criado ? copy.cards.suggested : copy.cards.alreadyExisted };
+        return { fase: 'registrado', mensagem: mensagemDaSugestao(temBrahma === 'sim', estouNoBar, r.valor) };
       }
       return estadoDaFalha(r.falha);
     });

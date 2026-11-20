@@ -22,7 +22,8 @@ const VISTOS = 'otcb_selos_vistos';
 // ou null se nunca carregou.
 export async function carregarPassaporte(): Promise<{ dados: Passaporte; doCache: boolean } | null> {
   try {
-    const { data, error } = await supabase.rpc('otcb_meu_passaporte');
+    // p_versao 2 (8.12): o app conhece o selo Divulgador.
+    const { data, error } = await supabase.rpc('otcb_meu_passaporte', { p_versao: 2 });
     if (error || !data) throw new Error(error?.message ?? 'vazio');
     const dados = data as unknown as Passaporte;
     AsyncStorage.setItem(CACHE, JSON.stringify(dados)).catch(() => undefined);

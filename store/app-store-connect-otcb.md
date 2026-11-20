@@ -67,7 +67,11 @@ bar,boteco,cerveja,happy hour,jogo,futebol,colarinho,passaporte,bares perto,onde
 
 ### Notas da versão (What's New)
 
-Primeira versão do OTCB: conversa para achar chopp bem tirado em São Paulo, Colarinhômetro com nota por IA, Passaporte de bares, onde ver o jogo e opiniões da comunidade.
+**1.0.2:**
+
+Ficou mais fácil ganhar carimbos e selos. Cadastrou um bar estando nele? Ele já entra confirmado e o carimbo é seu. A nota do colarinho agora vem por faixa, e tem selo novo: Divulgador, para quem compartilha o passaporte ou a nota.
+
+**1.0.0:** Primeira versão do OTCB: conversa para achar chopp bem tirado em São Paulo, Colarinhômetro com nota por IA, Passaporte de bares, onde ver o jogo e opiniões da comunidade.
 
 ---
 
@@ -126,8 +130,8 @@ Não coletados: Contact Info, Health & Fitness, Financial Info, Browsing History
 OTCB is a conversational assistant (in Brazilian Portuguese) for finding well-poured draft beer in São Paulo, Brazil. It is NOT a static list of bars — it is a native, AI-powered experience that only makes sense on a phone:
 
 1. AI CHAT AGENT (main screen): the user asks in natural language ("chopp perto de mim com balcão", "onde ver o jogo do Corinthians hoje") and an AI agent (Claude API, tool use over our own database) answers with interactive cards: bar cards with confirmation status and freshness, a mini map, route and ride buttons, and input cards (one-tap confirmations, opinion and bar-suggestion forms).
-2. COLARINHÔMETRO (camera): the user photographs their glass in the bar; AI vision scores the pour (foam height, creaminess, glass, apparent temperature). The photo, combined with the current location (≤150 m from a bar), confirms the bar and grants a stamp. Camera only — no photo library.
-3. PASSPORT: stamps per bar visited, neighborhood collections and badges for discovery. It rewards visiting different bars, never quantity consumed (no drinking challenges; daily stamp limit).
+2. COLARINHÔMETRO (camera): the user photographs their glass in the bar; AI vision scores the pour (foam height, creaminess, glass, apparent temperature). The photo, combined with the current location (≤300 m from a bar), confirms the bar and grants a stamp. Camera only — no photo library.
+3. PASSPORT: stamps per bar visited, neighborhood collections and badges for discovery. It rewards visiting different bars, never quantity consumed (no drinking challenges; daily stamp limit). Optional "Divulgador" badge: the user can share an image of their passport or pour score through the system share sheet; the badge is purely cosmetic, nothing in the app is locked behind it, and sharing is never required.
 4. WHERE TO WATCH THE GAME: today's football matches plus bars nearby that show games.
 5. COMMUNITY: moderated opinions (keyword filter + AI moderation, reporting), AI summary per bar, one-tap confirmations. A daily server-side crawler keeps the bar database fresh and evidence decays over time.
 
