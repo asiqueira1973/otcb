@@ -568,14 +568,15 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 ### Versão 1.0.2 do app (8.12, 20/11/2026)
 - **Plano:** `plans/8.12-versao-1.0.2.md`. Migrations `20261120000100` (enum `sugestao_sem_certeza`) e `20261120000200`; pgTAP 170 (10 casos) e 171 (13 casos); Jest `__tests__/v102/versao-1-0-2.test.tsx`.
 - **Sugestão feita no bar:** o card manda `p_no_bar` quando "Estou no bar agora" está ligado; o bar novo sai confirmado. A RPC devolve também `carimbo` (a foto recente sem bar virou carimbo), e o card avisa "o carimbo é seu".
-- **"Não sei" cadastra:** `p_tem_brahma` nulo cria o bar com a evidência `sugestao_sem_certeza` (peso 0, meia-vida 60): fica "a confirmar" sem pontuar Brahma, conta no limite de 5 por dia e no Informante, e nunca liga foto. Nulo num bar existente não grava nada. O app 1.0.1 não manda nulo.
+- **"Não sei" cadastra:** `p_tem_brahma` nulo cria o bar com a evidência `sugestao_sem_certeza` (peso 0, meia-vida 60): fica "a confirmar" sem pontuar Brahma, conta no limite de 5 por dia e no Informante, e nunca liga foto. Nulo num bar existente não grava nada, e o card só agradece. O app 1.0.1 não manda nulo.
 - **Resultado da foto sem bar:** o botão vira "Estou num bar que não está no app" e abre a sugestão com a localização do momento.
 - **Status na tela:** confirmado e provável aparecem iguais, "tem chopp Brahma", na cor de confirmado (`copy.bar.status`, `Pill.tsx`, `MiniMap.tsx`); incerto segue "a confirmar". A regra interna não mudou.
-- **Nota por faixa:** `faixaNota` (`colarinhometro/nota.ts`): ≥ 8 "Tirada de mestre", ≥ 6 "Boa tirada", abaixo "Dá pra melhorar". Aparece logo abaixo do número no resultado, em destaque na imagem de compartilhar e na ficha ("Colarinho: Boa tirada (7,4)", `formatCollar`). `formatScore` passou a reutilizar `notaTexto`.
+- **Nota por faixa:** `faixaNota` (`colarinhometro/nota.ts`): ≥ 8 "Tirada de mestre", ≥ 6 "Boa tirada", abaixo "Dá pra melhorar". No resultado e na imagem de compartilhar a faixa é maior que o número e na ficha ("Colarinho: Boa tirada (7,4)", `formatCollar`). `formatScore` passou a reutilizar `notaTexto`.
 - **Selo Divulgador:**
   - **Tabela `otcb_compartilhamentos`:** só leitura dos próprios (política `otcb_compartilhamentos_le_proprios`), cascade com o perfil.
   - **RPC `otcb_registrar_compartilhamento(p_origem)`:** origem `colarinho` ou `passaporte`, no máximo 10 por dia; devolve `{dias}`.
   - **No app:** `compartilharImagem` (`src/features/compartilhar/compartilhar.ts`) captura a imagem, abre a folha do sistema e, quando ela fecha, registra na confiança (o sistema não diz se a pessoa postou) e dispara `otcb_compartilhou {origem}`.
+  - **Imagem da nota:** nome de bar com a marca (a base tem o "Bar Brahma") fica fora da imagem; no app o nome aparece (achado do verifier do 8.12).
   - **Passaporte:** ganhou o botão "Compartilhar" e a `PassportShareCard` (Bolacha comemorando, bares carimbados e selos conquistados; sem apelido, localização, nomes de bar ou marca de cerveja). Depois de compartilhar, recarrega para animar o selo (A7).
   - **Níveis:** 1, 5 e 15 dias diferentes com compartilhamento.
 - **Versão do contrato do Passaporte:** `otcb_meu_passaporte(p_versao integer default 1)`; o selo Divulgador só vem com `p_versao >= 2`, que a 1.0.2 manda. O 1.0.1 e o agente (que chama sem argumento) continuam com os 5 selos.

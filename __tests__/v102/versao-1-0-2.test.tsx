@@ -8,6 +8,7 @@ import { SuggestionForm } from '../../src/features/cards/SuggestionForm';
 import type { ResultadoColarinho } from '../../src/features/chat/types';
 import { faixaNota } from '../../src/features/colarinhometro/nota';
 import { ResultCard } from '../../src/features/colarinhometro/ResultCard';
+import { ShareCard } from '../../src/features/colarinhometro/ShareCard';
 import type { Passaporte as Dados } from '../../src/features/passaporte/api';
 import { copy } from '../../src/lib/copy';
 import { renderWithSafeArea } from '../../test-utils/render';
@@ -156,7 +157,6 @@ describe('Colarinhômetro', () => {
   });
 
   it('na imagem e no resultado a faixa é maior que o número', async () => {
-    const { ShareCard } = await import('../../src/features/colarinhometro/ShareCard');
     await renderWithSafeArea(<ShareCard nomeBar="Bar Original" nota={8.6} comentario={null} />);
     const tamanho = (t: string) => [screen.getByText(t).props.style].flat().reduce((acc: number, st: { fontSize?: number }) => st?.fontSize ?? acc, 0);
     expect(tamanho(copy.colarinho.bands.master)).toBeGreaterThan(tamanho('8,6'));

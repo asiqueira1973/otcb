@@ -29,7 +29,7 @@ export async function coordenadasDaSugestao(estouNoBar: boolean, endereco: strin
 // Texto do card depois da sugestão (8.12). Recebe: se respondeu "Tem sim", se estava no bar e a resposta da RPC.
 // Devolve: "Não sei" → cadastrado como a confirmar; carimbo ganho; confirmado (no bar); a confirmar; ou 15.18.
 export function mensagemDaSugestao(temBrahma: boolean, noBar: boolean, r: { criado: boolean; carimbo: boolean }): string {
-  if (!temBrahma) return copy.cards.dontKnowNotice;
+  if (!temBrahma) return r.criado ? copy.cards.dontKnowNotice : copy.cards.dontKnowExisting;
   if (!r.criado) return r.carimbo ? copy.cards.alreadyExistedStamp : copy.cards.alreadyExisted;
   if (r.carimbo) return copy.cards.suggestedStamp;
   return noBar ? copy.cards.suggestedHere : copy.cards.suggested;

@@ -157,8 +157,9 @@ const styles = StyleSheet.create({
   card: { borderWidth: 2, borderRadius: 14, padding: 16, gap: 8, borderStyle: 'dashed' },
   title: { fontFamily: fonts.title, fontSize: 24, letterSpacing: 0.5 },
   bar: { fontFamily: fonts.body, fontSize: 15 },
-  nota: { fontFamily: fonts.title, fontSize: 72, lineHeight: 76, alignSelf: 'center' },
-  faixa: { fontFamily: fonts.title, fontSize: 30, letterSpacing: 0.5, alignSelf: 'center', marginTop: -4 },
+  // 8.12: a faixa em destaque, o número (que sobe de 0 até a nota) logo acima, menor.
+  nota: { fontFamily: fonts.title, fontSize: 44, lineHeight: 48, alignSelf: 'center' },
+  faixa: { fontFamily: fonts.title, fontSize: 48, lineHeight: 52, letterSpacing: 0.5, alignSelf: 'center' },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   barLabel: { fontFamily: fonts.body, fontSize: 14, width: 96 },
   barTrack: { flex: 1, height: 10, borderRadius: 5, overflow: 'hidden' },

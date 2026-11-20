@@ -17,7 +17,8 @@ export const ShareCard = forwardRef<ComponentRef<typeof View>, Props>(function S
       <Text style={styles.title}>{copy.colarinho.title}</Text>
       <Text style={styles.faixa}>{faixaNota(nota)}</Text>
       <Text style={styles.nota}>{notaTexto(nota)}</Text>
-      {nomeBar ? <Text style={styles.bar}>{nomeBar}</Text> : null}
+      {/* Nome de bar com a marca (há o "Bar Brahma" na base) fica fora: a imagem compartilhada não leva marca de cerveja. */}
+      {nomeBar && !/brahma/i.test(nomeBar) ? <Text style={styles.bar}>{nomeBar}</Text> : null}
       {comentario ? <Text style={styles.comentario}>{comentario}</Text> : null}
       <Text style={styles.assinatura}>{copy.colarinho.shareTagline}</Text>
     </View>
@@ -28,8 +29,8 @@ const styles = StyleSheet.create({
   card: { width: 360, padding: 24, backgroundColor: palette.white, borderRadius: 20, borderWidth: 3, borderColor: palette.blue, alignItems: 'center', gap: 6 },
   brand: { fontFamily: fonts.title, fontSize: 28, color: palette.red, letterSpacing: 1 },
   title: { fontFamily: fonts.title, fontSize: 22, color: '#14203A', letterSpacing: 0.5 },
-  faixa: { fontFamily: fonts.title, fontSize: 40, lineHeight: 44, color: palette.blue, letterSpacing: 0.5, textAlign: 'center' },
-  nota: { fontFamily: fonts.title, fontSize: 64, lineHeight: 68, color: palette.blue },
+  faixa: { fontFamily: fonts.title, fontSize: 56, lineHeight: 60, color: palette.blue, letterSpacing: 0.5, textAlign: 'center' },
+  nota: { fontFamily: fonts.title, fontSize: 36, lineHeight: 40, color: palette.blue },
   bar: { fontFamily: fonts.title, fontSize: 26, color: '#14203A', letterSpacing: 0.5, textAlign: 'center' },
   comentario: { fontFamily: fonts.body, fontSize: 17, lineHeight: 23, color: '#14203A', textAlign: 'center' },
   assinatura: { fontFamily: fonts.bodyBold, fontSize: 14, color: palette.red, marginTop: 8, textAlign: 'center' },

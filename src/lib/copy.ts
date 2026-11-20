@@ -137,6 +137,7 @@ export const copy = {
     dontKnow: 'Não sei', // tabela da 8.5
     suggest: 'Sugerir', // (proposto 8.5)
     dontKnowNotice: 'Valeu! Cadastrei como a confirmar; quem passar lá confirma.', // (proposto 8.12)
+    dontKnowExisting: 'Valeu! Esse bar já está aqui; quem passar lá confirma.', // (proposto 8.12) "Não sei" num bar existente
     suggested: 'Bar sugerido! Ele entra como a confirmar.', // (proposto 8.5)
     suggestedHere: 'Bar cadastrado e confirmado. Valeu!', // (proposto 8.12) sugerido estando no bar
     suggestedStamp: 'Bar cadastrado e confirmado. O carimbo é seu!', // (proposto 8.12) a foto recente virou carimbo

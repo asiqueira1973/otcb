@@ -69,7 +69,7 @@ bar,boteco,cerveja,happy hour,jogo,futebol,colarinho,passaporte,bares perto,onde
 
 **1.0.2:**
 
-Ficou mais fácil ganhar carimbos e selos. Cadastrou um bar estando nele? Ele já entra confirmado e o carimbo é seu. A nota do colarinho agora vem por faixa, e tem selo novo: Divulgador, para quem compartilha o passaporte ou a nota.
+Ficou mais fácil ganhar carimbos e selos. Cadastrou um bar estando nele? Ele já entra confirmado. A nota do colarinho agora vem por faixa, e tem selo novo: Divulgador, para quem compartilha o passaporte ou a nota.
 
 **1.0.0:** Primeira versão do OTCB: conversa para achar chopp bem tirado em São Paulo, Colarinhômetro com nota por IA, Passaporte de bares, onde ver o jogo e opiniões da comunidade.
 
