@@ -581,6 +581,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
   - **Níveis:** 1, 5 e 15 dias diferentes com compartilhamento.
 - **Versão do contrato do Passaporte:** `otcb_meu_passaporte(p_versao integer default 1)`; o selo Divulgador só vem com `p_versao >= 2`, que a 1.0.2 manda. O 1.0.1 e o agente (que chama sem argumento) continuam com os 5 selos.
 - **Descrições dos selos** em `copy.ts` com as regras do Grupo 1, mais a do Divulgador.
+- **Envio (20/11/2026):** iOS 1.0.2 (5) pelo `eas submit` e Android 1.0.2 (versionCode 7) pelo Play Console, os dois submetidos para revisão. A Play avisou que `android.hardware.screen.portrait` (vinda do `orientation: 'portrait'`) restringe aparelhos sem retrato (Chromebook, TV, XR); seguimos assim. Pendência para a próxima versão: declarar o recurso como opcional no manifesto.
 
 ### Foto sem bar ligada ao bar sugerido em seguida (19/11/2026)
 - **Caso real:** o Alexandre tirou a foto num bar que não estava no app (saiu sem carimbo, nota 7,9) e cadastrou o bar 2 minutos depois; a foto ficou solta e ele não ganhou o carimbo.
