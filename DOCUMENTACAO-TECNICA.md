@@ -16,7 +16,7 @@ Extensões usadas, liberadas pelo Alexandre: `pg_trgm`, `unaccent` e `pg_net` (n
 | `otcb_status_bar` | `confirmado`: tem chopp Brahma, com pontuação ≥ 1,0. `provavel`: ≥ 0,5. `incerto`: aparece como "a confirmar". `sem_brahma`: ≤ −0,5. `fechado`: o bar fechou. |
 | `otcb_assunto_evidencia` | Sobre o que é a evidência: se `tem_brahma`, se `transmite_jogos` ou o `funcionamento` do bar (aberto ou fechado). |
 | `otcb_sinal_evidencia` | `positivo` confirma, `negativo` nega, `fechado` diz que o bar fechou (só vale com `funcionamento`). |
-| `otcb_tipo_evidencia` | A fonte: `foto_colarinhometro`, `confirmacao_usuario`, `sugestao_usuario`, `cardapio_site`, `pagina_web`, `avaliacao_google`, `status_google` e `seed_otcb_antigo` (CSV antigo). `curadoria` (8.11): o dono do app atesta que o bar tem chopp. |
+| `otcb_tipo_evidencia` | A fonte: `foto_colarinhometro`, `confirmacao_usuario`, `sugestao_usuario`, `cardapio_site`, `pagina_web`, `avaliacao_google`, `status_google` e `seed_otcb_antigo` (CSV antigo). `curadoria` (8.11): o dono do app atesta que o bar tem chopp. `sugestao_no_bar` (19/11/2026): bar sugerido por quem está nele. |
 | `otcb_origem_evidencia` | Quem trouxe a evidência: `usuario`, `garimpo` ou `seed`. |
 | `otcb_status_opiniao` | `publicada`, `oculta_moderacao` (recusada pela IA), `oculta_denuncias` (3 denúncias) ou `oculta_admin`. |
 | `otcb_papel_mensagem` | Autor da mensagem do chat: `usuario`, `assistente` ou `sistema` (registro de ação feita por card). |
@@ -59,7 +59,7 @@ Extensões usadas, liberadas pelo Alexandre: `pg_trgm`, `unaccent` e `pg_net` (n
 
 **`otcb_fotos`**: cada foto do Colarinhômetro.
 - `usuario_id`.
-- `bar_id` e `distancia_bar_metros`: nulos sem bar a até 150 m.
+- `bar_id` e `distancia_bar_metros`: nulos sem bar a até 300 m (era 150 m até 19/11/2026).
 - `caminho_storage` = `{usuario_id}/{id}.jpg`. Um CHECK obriga a pasta a ser a do dono.
 - `e_chopp` (resposta da IA) e `usuario_confirmou_brahma` (resposta do usuário).
 - As quatro notas parciais (`nota_altura`, `nota_cremosidade`, `nota_copo`, `nota_gelado`) e `nota_colarinho`, a média ponderada calculada fora do modelo, todas de 0 a 10 (11.5).
@@ -111,7 +111,7 @@ Apagar o perfil apaga em cascata as fotos, carimbos, opiniões, denúncias e men
 | `otcb_recalcular_bar(bar)` | definer, só serviço | — | Regras 11.1, 11.2 e 11.3: soma as forças `peso × 0,5^(idade/meia-vida)`, contando só a evidência mais recente de cada usuário por assunto; decide o status na ordem fechado → sem_brahma → confirmado → provavel → incerto; grava a pontuação, o status, `transmite_jogos` e a data quando o status muda. |
 | trigger `otcb_trg_evidencia_recalcula` | after insert/delete | `otcb_evidencias` | Recalcula o bar da evidência. |
 | `otcb_recalcular_todos()` | definer, só serviço | cron diário | Recalcula status e pontuação dos bares ativos (decaimento) e reconstrói os agregados de fotos e opiniões. |
-| `otcb_bar_mais_proximo(lat, lng)` | definer, só serviço | Colarinhômetro (8.6) | Bar não excluído e não fechado a até 150 m; empate vai para a maior pontuação (11.4). |
+| `otcb_bar_mais_proximo(lat, lng)` | definer, só serviço | Colarinhômetro (8.6) | Bar não excluído e não fechado a até 300 m (era 150 m); empate vai para a maior pontuação (11.4). |
 | trigger `otcb_trg_foto_processa` | after insert, update de `excluido_em` e delete | `otcb_fotos` | Regra 11.4: com chopp, bar e confirmação do usuário, cria a evidência `foto_colarinhometro` e o carimbo (no máximo 1 por bar e 2 por dia de SP). Também recalcula a média e a contagem de fotos não excluídas (11.5). |
 | trigger `otcb_trg_opiniao_agrega` | after insert/update/delete | `otcb_opinioes` | Média e contagem das publicadas; abaixo de 3 publicadas, zera o resumo (11.8). |
 | trigger `otcb_trg_denuncia_conta` | after insert | `otcb_denuncias` | Soma a denúncia; na 3ª, a opinião vira `oculta_denuncias` (11.7). |
@@ -130,7 +130,7 @@ Todas exigem `authenticated` e nunca aceitam `anon`.
 | RPC | Entrada → saída | Regras e erros |
 |---|---|---|
 | `otcb_confirmar_bar` | bar, assunto, sinal → `{ok: true}` | `bar_inexistente`, `sinal_invalido` (`funcionamento` só aceita `fechado`; os outros assuntos não aceitam `fechado`), `limite_confirmacao`. |
-| `otcb_sugerir_bar` | nome, endereço, bairro, lat, lng, tem_brahma → `{bar_id, criado}` | Se casa com um bar existente (até 80 m e similaridade ≥ 0,5), grava uma confirmação nele e devolve `criado: false`. Se não casa, cria o bar como `incerto` mais a evidência `sugestao_usuario`. Erros: `limite_sugestao` (5 por dia), `dados_invalidos` (inclusive bar novo com `tem_brahma = false`). |
+| `otcb_sugerir_bar` | nome, endereço, bairro, lat, lng, tem_brahma, no_bar (opcional, padrão false) → `{bar_id, criado}` | Se casa com um bar existente (até 80 m e similaridade ≥ 0,5), grava uma confirmação nele e devolve `criado: false`. Se não casa, cria o bar mais a evidência `sugestao_usuario` (fica `incerto`) ou, com `no_bar`, `sugestao_no_bar` (fica confirmado). Nos dois casos liga a foto recente sem bar. Erros: `limite_sugestao` (5 por dia), `dados_invalidos` (inclusive bar novo com `tem_brahma = false`). |
 | `otcb_buscar_bares` | lat/lng, raio, texto, bairro, filtros → até 8 `CardBar` | Invoker (11.9). Só aparece bar não excluído, com status confirmado, provavel ou incerto e pontuação ≥ 0,1. Raio de 2 km por padrão, até 10 km. Ordena por status e depois por distância. Sem localização, exige texto ou bairro (`localizacao_ou_bairro_obrigatorio`). |
 | `otcb_agregados_confirmacao` | bar → última confirmação e pessoas distintas em 60 dias | Definer; devolve só números, sem dizer quem confirmou. Cada positiva anônima conta como uma pessoa (depois da anonimização resta no máximo uma por pessoa e bar). |
 | `otcb_detalhes_bar` | bar → `CardBar` | Definer; erro `bar_inexistente`. |
@@ -553,6 +553,17 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Regra:** `limparNomeBar` (`otcb-garimpo/nome.ts`) corta no primeiro separador (`:`, `|`, `–`, `—`, ` - `) quando o nome passa de 40 caracteres e, se ainda passar de 60, no fim de palavra. Nomes curtos de filial ("Sao Conrado - Vila Madalena") ficam. Teste `nome_test.ts`.
 - **Dados:** "Bar Dois Irmãos" e "Bar do Juarez Itaim Bibi" corrigidos no remoto.
 
+### Jogo mais simples (19/11/2026)
+- **Pedido do Alexandre:** "o objetivo do app é ser divertido e não complexo". Grupo 1, só no servidor (migrations `20261119000200` e `20261119000300`):
+  - **Carimbo:** o bar pode estar a até 300 m da foto (era 150 m; o GPS dentro de bar erra fácil).
+  - **Bairro:** conquistado com 2 carimbos, ou com todos se o bairro tiver 1 bar só. `total_bares` passa a devolver essa meta, então a tela atual mostra "1 de 2" sem mudar o app.
+  - **Explorador:** níveis em 3, 10 e 25 bares (eram 5, 15 e 30).
+  - **Olho clínico:** nota 8,0 ou mais em 3 bares (eram 9,0 em 5).
+  - **Informante:** 10 contribuições quaisquer (confirmação, sugestão de bar, opinião), sem esperar o bar ficar confirmado.
+  - **Sugestão feita no bar:** `otcb_sugerir_bar` ganhou `p_no_bar boolean default false`. Com `true`, a evidência é `sugestao_no_bar` (peso 1,0, meia-vida 90, como a foto) e o bar novo já sai confirmado. O app 1.0.1 não manda o campo, então segue como antes; a próxima versão manda quando a pessoa disser que está no bar. O limite de 5 sugestões por dia conta os dois tipos.
+- **Testes:** pgTAP 161 (5 casos); 110, 120 e 060 atualizados com a regra nova escrita no comentário.
+- **Ainda no app (próxima versão):** enviar `p_no_bar`, e as descrições dos selos em `src/lib/copy.ts` (Olho clínico "nota 8 ou mais em 3 bares", Informante).
+
 ### Foto sem bar ligada ao bar sugerido em seguida (19/11/2026)
 - **Caso real:** o Alexandre tirou a foto num bar que não estava no app (saiu sem carimbo, nota 7,9) e cadastrou o bar 2 minutos depois; a foto ficou solta e ele não ganhou o carimbo.
 - **Regra nova (pedido dele: "deixar o jogo mais fácil"):** ao sugerir um bar (novo ou que casa com um existente, "tem Brahma"), `otcb_sugerir_bar` chama `otcb_ligar_foto_recente`: a foto mais recente da pessoa, sem bar, de chopp e com "é Brahma", dos últimos 30 minutos, passa a ser do bar. O trigger `otcb_trg_foto_processa` agora também roda quando a foto ganha bar (`update of bar_id`, de nulo para um bar): cria a evidência de foto (peso 1,0, com data de agora, para ser o voto mais recente da pessoa) e o carimbo, e recalcula a média. Migration `20261119000100`, pgTAP 160 (8 casos). Só no servidor.
@@ -645,7 +656,7 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | `otcb_trg_foto_processa` também roda no update de `excluido_em` | A 7.5 fala só em insert. | A média da 11.5 é sobre fotos não excluídas. |
 | `otcb_meu_passaporte` como security definer | A 7.5 diz invoker. | O selo Informante lê as próprias evidências, que o RLS reserva ao admin; o filtro é `auth.uid()`. |
 | `otcb_agregados_confirmacao` e `otcb_bar_mais_proximo` | Funções novas. | Agregados do `CardBar` sem expor evidências (5.2); a regra 11.4 aplicada no banco para a Edge Function do 8.6. |
-| `otcb_sugerir_bar` | Bar novo com `tem_brahma = false` gera `dados_invalidos`; sugestão que casa vira confirmação. | A copy 15.18 diz "sua confirmação foi registrada"; sem Brahma não há o que cadastrar. Assim o limite de 5 por dia conta as evidências `sugestao_usuario`. |
+| `otcb_sugerir_bar` | Bar novo com `tem_brahma = false` gera `dados_invalidos`; sugestão que casa vira confirmação. | A copy 15.18 diz "sua confirmação foi registrada"; sem Brahma não há o que cadastrar. Assim o limite de 5 por dia conta as evidências `sugestao_usuario` e `sugestao_no_bar`. |
 | `otcb_detalhes_bar` | Devolve o status real (pode ser `sem_brahma` ou `fechado`). | A assinatura não traz contexto; o agente só mostra os visíveis da 11.9. |
 | Fechamento pelo Google | Interpretação literal: um `status_google` fechado só é anulado por foto ou confirmação positiva de usuário mais recente. | O spec não trata o Google voltar a dizer OPERATIONAL; ponto registrado no plano 8.2. |
 | CHECK `otcb_fotos_caminho_do_dono` | Restrição a mais. | Garante a pasta `{usuario_id}/` exigida pela 7.2 e pela política de storage. |
@@ -699,4 +710,5 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 | Numeração de build no EAS (8.11) | `appVersionSource: remote` em vez de local. | O `autoIncrement` não funciona com `app.config.ts` dinâmico e numeração local. |
 | Envio antes do teste em aparelho (8.11) | Os builds foram enviados para revisão antes do teste num iPhone e num Android físicos (critério 4 do 8.11); os dois apps já estão publicados (Apple 08/11, Play 10/11). | iPhone: testado pelo Alexandre em 08/11/2026 com o build de produção (TestFlight 1.0.0 (1)), tudo funcionando, inclusive o "Chamar Uber" (abre o Uber com o destino no bar e a origem na localização atual). Android: pendente (teste interno da Play). |
 | Fonte de jogos: API-Football no plano grátis (emenda do 8.11) | Troca do football-data.org (13.9 e premissa P2) pela API-Football. No plano grátis a janela é só hoje e amanhã, não 7 dias. | Decisão do Alexandre (08/11/2026) para cobrir Copa do Brasil, estaduais e Seleção. Efeito: o critério 2 do 8.9 ("oferece o próximo jogo dos 7 dias") fica limitado a amanhã até assinar o plano Pro (US$ 19/mês, pré-pago), que libera os 7 dias sem mudar o código. |
+| Jogo mais simples (19/11/2026) | Carimbo a 300 m (11.4 diz 150 m); bairro com 2 carimbos, Explorador 3/10/25, Olho clínico ≥ 8,0 em 3 bares, Informante com qualquer contribuição (11.11); nova evidência `sugestao_no_bar` com peso 1,0 (11.1). | Decisão do Alexandre: o jogo tem que ser divertido e com menos regras. |
 | Agente do chat no Haiku (8.11) | `MODELO_AGENTE` = `claude-haiku-5-5`, não o `claude-sonnet-5-5` da seção 4.1. | Decisão do Alexandre (08/11/2026) por custo. Avaliação 26/26 (p50 3,7 s, p95 5,5 s, contra 4,9 s e 8,9 s com o Sonnet). Na troca, o Haiku esqueceu o card do Passaporte; o servidor passou a acrescentá-lo quando `meu_passaporte` é consultado (teste). Duas perguntas da avaliação foram corrigidas: o Bar Leo virou confirmado com a curadoria (o caso c4 usa agora o Bar Brahma Paulista, ainda a confirmar) e a expressão do caso ambev casava com "não sou da Ambev". |

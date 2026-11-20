@@ -2,7 +2,7 @@
 -- p_no_bar = true (a pessoa está no bar, coordenadas do celular) vale como prova forte e o bar já sai confirmado.
 -- Sem o parâmetro (app atual), continua como antes: "a confirmar".
 begin;
-select plan(4);
+select plan(5);
 
 insert into auth.users (id, aud, role, is_anonymous, instance_id) values
   ('00000000-0000-0000-0000-0000001610a1', 'authenticated', 'authenticated', true, '00000000-0000-0000-0000-000000000000');
@@ -20,6 +20,14 @@ select is((select tipo::text from public.otcb_evidencias where bar_id = (select 
 select is((select status::text from public.otcb_bares where id = (select de_casa from t161)), 'incerto', 'sugerido sem estar no bar → a confirmar (como antes)');
 select ok(has_function_privilege('authenticated', 'public.otcb_sugerir_bar(text, text, text, double precision, double precision, boolean, boolean)', 'execute'),
   'o app pode chamar a versão com p_no_bar');
+
+-- O limite de 5 sugestões por dia vale também para a sugestão feita no bar (2 feitas acima + 3 = 5; a 6ª é barrada).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000001610a1","role":"authenticated"}', true);
+select public.otcb_sugerir_bar('Bar 161 ' || g, 'Rua', 'Vila 161', -16.3 - g * 0.01, -46.1, true, true) from generate_series(1, 3) g;
+select throws_ok($$ select public.otcb_sugerir_bar('Bar 161 sexto', 'Rua', 'Vila 161', -16.9, -46.1, true, true) $$,
+  'P0001', 'limite_sugestao', 'a sugestão no bar também conta no limite de 5 por dia');
+reset role;
 
 select * from finish();
 rollback;

@@ -114,7 +114,8 @@ CREATE TYPE "public"."otcb_tipo_evidencia" AS ENUM (
     'avaliacao_google',
     'status_google',
     'seed_otcb_antigo',
-    'curadoria'
+    'curadoria',
+    'sugestao_no_bar'
 );
 
 
@@ -336,9 +337,9 @@ CREATE OR REPLACE FUNCTION "public"."otcb_bar_mais_proximo"("p_latitude" double 
   select b.id, round(public.otcb_distancia_metros(p_latitude, p_longitude, b.latitude::float8, b.longitude::float8))::integer
     from public.otcb_bares b
    where b.excluido_em is null and b.status <> 'fechado'
-     and b.latitude between p_latitude - 0.002 and p_latitude + 0.002
-     and b.longitude between p_longitude - 0.002 and p_longitude + 0.002
-     and public.otcb_distancia_metros(p_latitude, p_longitude, b.latitude::float8, b.longitude::float8) <= 150
+     and b.latitude between p_latitude - 0.003 and p_latitude + 0.003
+     and b.longitude between p_longitude - 0.003 and p_longitude + 0.003
+     and public.otcb_distancia_metros(p_latitude, p_longitude, b.latitude::float8, b.longitude::float8) <= 300
    order by public.otcb_distancia_metros(p_latitude, p_longitude, b.latitude::float8, b.longitude::float8),
             b.pontuacao_brahma desc
    limit 1;
@@ -991,8 +992,9 @@ begin
     join public.otcb_bares b on b.id = c.bar_id
    where c.usuario_id = v_uid;
 
-  select coalesce(jsonb_agg(jsonb_build_object('bairro', t.bairro, 'carimbos', t.carimbos, 'total_bares', t.total,
-                                               'conquistado', t.carimbos >= least(3, t.total))
+  -- Bairro conquistado com 2 carimbos (ou todos, se o bairro tiver 1 bar); total_bares devolve a meta.
+  select coalesce(jsonb_agg(jsonb_build_object('bairro', t.bairro, 'carimbos', t.carimbos, 'total_bares', least(2, t.total),
+                                               'conquistado', t.carimbos >= least(2, t.total))
                             order by t.bairro), '[]'::jsonb)
     into v_bairros
     from (select a.bairro,
@@ -1012,14 +1014,13 @@ begin
 
   select count(distinct f.bar_id)::integer into v_olho
     from public.otcb_fotos f
-   where f.usuario_id = v_uid and f.nota_colarinho >= 9.0 and f.bar_id is not null;
+   where f.usuario_id = v_uid and f.nota_colarinho >= 8.0 and f.bar_id is not null;
 
-  select count(*)::integer into v_informante
-    from public.otcb_evidencias e
-    join public.otcb_bares b on b.id = e.bar_id
-   where e.usuario_id = v_uid and e.tipo in ('confirmacao_usuario', 'sugestao_usuario')
-     and e.assunto = 'tem_brahma' and e.sinal = 'positivo'
-     and b.status in ('confirmado', 'provavel');
+  -- Informante: contribuições quaisquer (confirmação, sugestão, opinião), sem depender do status do bar.
+  select (select count(*)::integer from public.otcb_evidencias e
+           where e.usuario_id = v_uid and e.tipo in ('confirmacao_usuario', 'sugestao_usuario', 'sugestao_no_bar'))
+       + (select count(*)::integer from public.otcb_opinioes o where o.usuario_id = v_uid)
+    into v_informante;
 
   return jsonb_build_object(
     'carimbos', v_carimbos,
@@ -1029,12 +1030,12 @@ begin
       jsonb_build_object('selo', 'primeira_tirada', 'progresso', least(v_qtd_carimbos, 1), 'meta', 1,
                          'conquistado', v_qtd_carimbos >= 1),
       jsonb_build_object('selo', 'explorador', 'progresso', v_qtd_carimbos,
-                         'meta', case when v_qtd_carimbos < 5 then 5 when v_qtd_carimbos < 15 then 15 else 30 end,
-                         'nivel', case when v_qtd_carimbos >= 30 then 3 when v_qtd_carimbos >= 15 then 2
-                                       when v_qtd_carimbos >= 5 then 1 else 0 end,
-                         'conquistado', v_qtd_carimbos >= 5),
+                         'meta', case when v_qtd_carimbos < 3 then 3 when v_qtd_carimbos < 10 then 10 else 25 end,
+                         'nivel', case when v_qtd_carimbos >= 25 then 3 when v_qtd_carimbos >= 10 then 2
+                                       when v_qtd_carimbos >= 3 then 1 else 0 end,
+                         'conquistado', v_qtd_carimbos >= 3),
       jsonb_build_object('selo', 'andarilho', 'progresso', v_qtd_bairros, 'meta', 5, 'conquistado', v_qtd_bairros >= 5),
-      jsonb_build_object('selo', 'olho_clinico', 'progresso', v_olho, 'meta', 5, 'conquistado', v_olho >= 5),
+      jsonb_build_object('selo', 'olho_clinico', 'progresso', v_olho, 'meta', 3, 'conquistado', v_olho >= 3),
       jsonb_build_object('selo', 'informante', 'progresso', v_informante, 'meta', 10, 'conquistado', v_informante >= 10)
     )
   );
@@ -1374,6 +1375,8 @@ begin
       peso := 0.2; meia_vida_dias := 180;
     when p_tipo = 'curadoria' and p_assunto = 'tem_brahma' and p_sinal = 'positivo' then
       peso := 1.2; meia_vida_dias := 36500;
+    when p_tipo = 'sugestao_no_bar' and p_assunto = 'tem_brahma' and p_sinal = 'positivo' then
+      peso := 1.0; meia_vida_dias := 90;
     else
       raise exception 'evidencia_invalida' using errcode = '22023';
   end case;
@@ -1465,7 +1468,7 @@ $$;
 ALTER FUNCTION "public"."otcb_salvar_opiniao"("p_usuario" "uuid", "p_bar_id" "uuid", "p_texto" "text", "p_nota" smallint) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) RETURNS "jsonb"
+CREATE OR REPLACE FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean, "p_no_bar" boolean DEFAULT false) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -1497,7 +1500,7 @@ begin
   end if;
 
   if (select count(*) from public.otcb_evidencias e
-       where e.usuario_id = v_uid and e.tipo = 'sugestao_usuario'
+       where e.usuario_id = v_uid and e.tipo in ('sugestao_usuario', 'sugestao_no_bar')
          and public.otcb_dia_sp(e.data_evidencia) = public.otcb_hoje_sp()) >= 5 then
     raise exception 'limite_sugestao' using errcode = 'P0001';
   end if;
@@ -1506,8 +1509,11 @@ begin
   values (v_nome, v_endereco, v_bairro, round(p_latitude::numeric, 6), round(p_longitude::numeric, 6))
   returning id into v_bar;
 
+  -- Sugestão feita estando no bar (p_no_bar, coordenadas do celular) vale como prova forte: o bar sai confirmado.
   insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, usuario_id, data_evidencia, peso, meia_vida_dias)
-  values (v_bar, 'tem_brahma', 'positivo', 'sugestao_usuario', 'usuario', v_uid, now(), 0, 1);
+  values (v_bar, 'tem_brahma', 'positivo',
+          case when p_no_bar then 'sugestao_no_bar' else 'sugestao_usuario' end::public.otcb_tipo_evidencia,
+          'usuario', v_uid, now(), 0, 1);
 
   perform public.otcb_ligar_foto_recente(v_uid, v_bar);
   return jsonb_build_object('bar_id', v_bar, 'criado', true);
@@ -1515,7 +1521,7 @@ end;
 $$;
 
 
-ALTER FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) OWNER TO "postgres";
+ALTER FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean, "p_no_bar" boolean) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."otcb_time_canonico"("p_nome" "text") RETURNS "text"
@@ -2444,9 +2450,9 @@ GRANT ALL ON FUNCTION "public"."otcb_salvar_opiniao"("p_usuario" "uuid", "p_bar_
 
 
 
-REVOKE ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean, "p_no_bar" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean, "p_no_bar" boolean) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."otcb_sugerir_bar"("p_nome" "text", "p_endereco" "text", "p_bairro" "text", "p_latitude" double precision, "p_longitude" double precision, "p_tem_brahma" boolean, "p_no_bar" boolean) TO "service_role";
 
 
 

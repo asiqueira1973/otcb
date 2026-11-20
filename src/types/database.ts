@@ -381,7 +381,7 @@ isOneToOne: false
 { Args: { "p_bar_id": string,"p_nota": number,"p_texto": string,"p_usuario": string }; Returns: string
                            },
 "otcb_sugerir_bar":
-{ Args: { "p_bairro": string,"p_endereco": string,"p_latitude": number,"p_longitude": number,"p_nome": string,"p_tem_brahma": boolean }; Returns: Json
+{ Args: { "p_bairro": string,"p_endereco": string,"p_latitude": number,"p_longitude": number,"p_no_bar"?: boolean,"p_nome": string,"p_tem_brahma": boolean }; Returns: Json
                            },
 "otcb_time_canonico":
 { Args: { "p_nome": string }; Returns: string
@@ -391,7 +391,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "otcb_assunto_evidencia": "tem_brahma"|"transmite_jogos"|"funcionamento","otcb_origem_evidencia": "usuario"|"garimpo"|"seed","otcb_papel": "usuario"|"admin","otcb_papel_mensagem": "usuario"|"assistente"|"sistema","otcb_sinal_evidencia": "positivo"|"negativo"|"fechado","otcb_status_bar": "confirmado"|"provavel"|"incerto"|"sem_brahma"|"fechado","otcb_status_execucao": "em_andamento"|"concluida"|"falhou","otcb_status_opiniao": "publicada"|"oculta_moderacao"|"oculta_denuncias"|"oculta_admin","otcb_tipo_evidencia": "foto_colarinhometro"|"confirmacao_usuario"|"sugestao_usuario"|"cardapio_site"|"pagina_web"|"avaliacao_google"|"status_google"|"seed_otcb_antigo"|"curadoria","otcb_tipo_execucao": "descoberta"|"revisita"|"coordenadas"|"resumos"|"jogos"
+            "otcb_assunto_evidencia": "tem_brahma"|"transmite_jogos"|"funcionamento","otcb_origem_evidencia": "usuario"|"garimpo"|"seed","otcb_papel": "usuario"|"admin","otcb_papel_mensagem": "usuario"|"assistente"|"sistema","otcb_sinal_evidencia": "positivo"|"negativo"|"fechado","otcb_status_bar": "confirmado"|"provavel"|"incerto"|"sem_brahma"|"fechado","otcb_status_execucao": "em_andamento"|"concluida"|"falhou","otcb_status_opiniao": "publicada"|"oculta_moderacao"|"oculta_denuncias"|"oculta_admin","otcb_tipo_evidencia": "foto_colarinhometro"|"confirmacao_usuario"|"sugestao_usuario"|"cardapio_site"|"pagina_web"|"avaliacao_google"|"status_google"|"seed_otcb_antigo"|"curadoria"|"sugestao_no_bar","otcb_tipo_execucao": "descoberta"|"revisita"|"coordenadas"|"resumos"|"jogos"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -507,7 +507,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "otcb_assunto_evidencia": ["tem_brahma", "transmite_jogos", "funcionamento"],"otcb_origem_evidencia": ["usuario", "garimpo", "seed"],"otcb_papel": ["usuario", "admin"],"otcb_papel_mensagem": ["usuario", "assistente", "sistema"],"otcb_sinal_evidencia": ["positivo", "negativo", "fechado"],"otcb_status_bar": ["confirmado", "provavel", "incerto", "sem_brahma", "fechado"],"otcb_status_execucao": ["em_andamento", "concluida", "falhou"],"otcb_status_opiniao": ["publicada", "oculta_moderacao", "oculta_denuncias", "oculta_admin"],"otcb_tipo_evidencia": ["foto_colarinhometro", "confirmacao_usuario", "sugestao_usuario", "cardapio_site", "pagina_web", "avaliacao_google", "status_google", "seed_otcb_antigo", "curadoria"],"otcb_tipo_execucao": ["descoberta", "revisita", "coordenadas", "resumos", "jogos"]
+            "otcb_assunto_evidencia": ["tem_brahma", "transmite_jogos", "funcionamento"],"otcb_origem_evidencia": ["usuario", "garimpo", "seed"],"otcb_papel": ["usuario", "admin"],"otcb_papel_mensagem": ["usuario", "assistente", "sistema"],"otcb_sinal_evidencia": ["positivo", "negativo", "fechado"],"otcb_status_bar": ["confirmado", "provavel", "incerto", "sem_brahma", "fechado"],"otcb_status_execucao": ["em_andamento", "concluida", "falhou"],"otcb_status_opiniao": ["publicada", "oculta_moderacao", "oculta_denuncias", "oculta_admin"],"otcb_tipo_evidencia": ["foto_colarinhometro", "confirmacao_usuario", "sugestao_usuario", "cardapio_site", "pagina_web", "avaliacao_google", "status_google", "seed_otcb_antigo", "curadoria", "sugestao_no_bar"],"otcb_tipo_execucao": ["descoberta", "revisita", "coordenadas", "resumos", "jogos"]
           }
         }
 } as const

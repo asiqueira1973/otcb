@@ -130,9 +130,10 @@ select is((select (c ->> 'carimbos')::int from jsonb_array_elements(public.otcb_
 select is((public.otcb_meu_passaporte() -> 'colecao_classicos' ->> 'carimbos')::int, 1, '11.11: coleção Clássicos');
 -- Informante: A tem tem_brahma positivo no bar 3 (0,2 + 0,6 = 0,8 → provável) e no bar 2 (sugestão casada,
 -- provável), mais uma confirmação de transmite_jogos no bar 3 e 5 bares sugeridos (incertos, 0,3).
--- Só as duas de tem_brahma em bar provável "ajudaram"; a de transmite_jogos e as dos incertos não contam.
+-- Flexibilização de 19/11/2026 (pedido do Alexandre): toda contribuição conta, sem depender do status do bar nem do
+-- assunto: 2 de tem_brahma + 1 de transmite_jogos + 5 sugestões = 8.
 select is((select (s ->> 'progresso')::int from jsonb_array_elements(public.otcb_meu_passaporte() -> 'selos') s
-            where s ->> 'selo' = 'informante'), 2, '11.11: Informante conta só tem_brahma positivo em bar confirmado/provável');
+            where s ->> 'selo' = 'informante'), 8, '11.11: Informante conta toda contribuição (confirmações e sugestões)');
 reset role;
 -- Carimbo em bar incerto do bairro (bar 4, semente velha) também conta na coleção do bairro.
 insert into public.otcb_carimbos (usuario_id, bar_id) values ('00000000-0000-0000-0000-0000000060a1', '00000000-0000-0000-0000-000000600004');
