@@ -3,7 +3,7 @@
 -- Brahma); se casa com um bar existente, não grava nada; nunca liga foto. A sugestão também passa a devolver
 -- "carimbo": se a foto recente sem bar virou carimbo.
 begin;
-select plan(10);
+select plan(11);
 
 insert into auth.users (id, aud, role, is_anonymous, instance_id) values
   ('00000000-0000-0000-0000-0000001700a1', 'authenticated', 'authenticated', true, '00000000-0000-0000-0000-000000000000');
@@ -49,6 +49,14 @@ reset role;
 select is((select (r ->> 'carimbo')::boolean from t170c), true, 'foto recente ligada → carimbo = true');
 select is((select count(*)::int from public.otcb_carimbos where usuario_id = '00000000-0000-0000-0000-0000001700a1'), 1,
   'o carimbo existe');
+
+-- Verifier do 8.12: "Não sei" conta no limite de 5 sugestões por dia (2 feitas acima: a de "Não sei" e a com foto).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000001700a1","role":"authenticated"}', true);
+select public.otcb_sugerir_bar('Bar 170 extra ' || g, 'Rua', 'Vila 170', -17.6 - g * 0.01, -47.0, null) from generate_series(1, 3) g;
+select throws_ok($$ select public.otcb_sugerir_bar('Bar 170 sexto', 'Rua', 'Vila 170', -17.95, -47.0, null) $$,
+  'P0001', 'limite_sugestao', '"Não sei" também conta no limite de 5 por dia');
+reset role;
 
 select * from finish();
 rollback;

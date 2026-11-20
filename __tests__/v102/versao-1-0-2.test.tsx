@@ -85,6 +85,16 @@ describe('sugestão de bar', () => {
     expect(mockRpc).toHaveBeenCalledWith('otcb_sugerir_bar', expect.objectContaining({ p_no_bar: false }));
   });
 
+  // Verifier do 8.12: "Não sei" num bar que já existe não grava nada; não pode dizer "cadastrei".
+  it('"Não sei" num bar que já existe agradece sem dizer que cadastrou', async () => {
+    mockGeocode.mockResolvedValue([{ latitude: -23.6, longitude: -46.67 }]);
+    mockRpc.mockResolvedValueOnce({ data: { bar_id: 'b4', criado: false, carimbo: false }, error: null });
+    await renderWithSafeArea(<SuggestionForm chave={chave()} nome="Bar Jobim" endereco="Rua A, 1" bairro="Moema" usarLocalizacaoAtual={false} />);
+    await fireEvent.press(screen.getByTestId('tem-brahma-nao_sei'));
+    await fireEvent.press(screen.getByTestId('enviar-sugestao'));
+    await waitFor(() => expect(screen.getByText(copy.cards.dontKnowExisting)).toBeTruthy());
+  });
+
   it('"Não sei" cadastra como a confirmar (p_tem_brahma nulo)', async () => {
     mockGeocode.mockResolvedValue([{ latitude: -23.6, longitude: -46.67 }]);
     mockRpc.mockResolvedValueOnce({ data: { bar_id: 'b3', criado: true, carimbo: false }, error: null });
@@ -138,6 +148,20 @@ describe('Colarinhômetro', () => {
     expect(JSON.stringify(screen.getByTestId('share-card'))).not.toMatch(/brahma/i);
   });
 
+  // Verifier do 8.12: a base tem o "Bar Brahma"; a imagem compartilhada nunca leva a marca.
+  it('nome de bar com a marca fica fora da imagem de compartilhar', async () => {
+    await renderWithSafeArea(<ResultCard bloco={{ ...BLOCO, nome_bar: 'Bar Brahma' }} animar={false} />);
+    expect(JSON.stringify(screen.getByTestId('share-card'))).not.toMatch(/brahma/i);
+    expect(screen.getByText('Bar Brahma')).toBeTruthy(); // no app o nome continua aparecendo
+  });
+
+  it('na imagem e no resultado a faixa é maior que o número', async () => {
+    const { ShareCard } = await import('../../src/features/colarinhometro/ShareCard');
+    await renderWithSafeArea(<ShareCard nomeBar="Bar Original" nota={8.6} comentario={null} />);
+    const tamanho = (t: string) => [screen.getByText(t).props.style].flat().reduce((acc: number, st: { fontSize?: number }) => st?.fontSize ?? acc, 0);
+    expect(tamanho(copy.colarinho.bands.master)).toBeGreaterThan(tamanho('8,6'));
+  });
+
   it('compartilhar a nota registra o compartilhamento (selo Divulgador)', async () => {
     mockRpc.mockResolvedValue({ data: { dias: 1 }, error: null });
     await renderWithSafeArea(<ResultCard bloco={BLOCO} animar={false} />);
@@ -167,6 +191,7 @@ describe('Passaporte', () => {
       Promise.resolve(nome === 'otcb_meu_passaporte' ? { data: DADOS, error: null } : { data: { dias: 1 }, error: null }));
     await renderWithSafeArea(<Passaporte />);
     await waitFor(() => expect(screen.getByTestId('compartilhar-passaporte')).toBeTruthy());
+    // A imagem do Passaporte fica escondida do leitor de tela (está fora da tela); por isso includeHiddenElements.
     const imagem = JSON.stringify(screen.getByTestId('passport-share-card', { includeHiddenElements: true }));
     expect(imagem).toContain('1 bar carimbado');
     expect(imagem).not.toMatch(/brahma|-23\.|-46\./i);
