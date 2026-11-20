@@ -144,13 +144,16 @@ describe('formulario_opiniao', () => {
 });
 
 describe('formulario_sugestao_bar', () => {
-  it('"Não sei" não grava nada', async () => {
+  // Regra mudada no 8.12 (versão 1.0.2, pedido do Alexandre): "Não sei" deixou de descartar a dica e cadastra o bar
+  // como "a confirmar", sem pontuar Brahma (p_tem_brahma nulo). Antes: "não grava nada".
+  it('"Não sei" cadastra como a confirmar', async () => {
+    mockGeocode.mockResolvedValue([{ latitude: -23.6, longitude: -46.67 }]);
+    mockRpc.mockResolvedValueOnce({ data: { bar_id: 'b8', criado: true, carimbo: false }, error: null });
     await renderWithSafeArea(<SuggestionForm chave={chave()} nome="Bar Novo" endereco="Rua A, 1" bairro="Moema" usarLocalizacaoAtual={false} />);
     await fireEvent.press(screen.getByTestId('tem-brahma-nao_sei'));
     await fireEvent.press(screen.getByTestId('enviar-sugestao'));
     await waitFor(() => expect(screen.getByText(copy.cards.dontKnowNotice)).toBeTruthy());
-    expect(mockRpc).not.toHaveBeenCalled();
-    expect(mockGeocode).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith('otcb_sugerir_bar', expect.objectContaining({ p_tem_brahma: null }));
   });
 
   it('critério 6: bar que já existia mostra 15.18', async () => {
@@ -170,8 +173,9 @@ describe('formulario_sugestao_bar', () => {
     await renderWithSafeArea(<SuggestionForm chave={chave()} nome="Bar Novo" endereco="Rua B, 2" bairro="Pinheiros" usarLocalizacaoAtual />);
     await fireEvent.press(screen.getByTestId('tem-brahma-sim'));
     await fireEvent.press(screen.getByTestId('enviar-sugestao'));
-    await waitFor(() => expect(screen.getByText(copy.cards.suggested)).toBeTruthy());
-    expect(mockRpc).toHaveBeenCalledWith('otcb_sugerir_bar', expect.objectContaining({ p_latitude: -23.56, p_longitude: -46.69 }));
+    // 8.12: estando no bar, o bar já sai confirmado (texto suggestedHere).
+    await waitFor(() => expect(screen.getByText(copy.cards.suggestedHere)).toBeTruthy());
+    expect(mockRpc).toHaveBeenCalledWith('otcb_sugerir_bar', expect.objectContaining({ p_latitude: -23.56, p_longitude: -46.69, p_no_bar: true }));
 
     mockGeocode.mockResolvedValue([]);
     await renderWithSafeArea(<SuggestionForm chave={chave()} nome="Bar X" endereco="Rua inexistente" bairro="Lugar" usarLocalizacaoAtual={false} />);

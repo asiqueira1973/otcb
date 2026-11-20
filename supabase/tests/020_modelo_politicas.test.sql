@@ -6,9 +6,9 @@ select is(
   (select array_agg(c.relname::text order by c.relname)
      from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'otcb\_%' and c.relrowsecurity),
-  array['otcb_bares','otcb_carimbos','otcb_denuncias','otcb_evidencias','otcb_execucoes_garimpo',
+  array['otcb_bares','otcb_carimbos','otcb_compartilhamentos','otcb_denuncias','otcb_evidencias','otcb_execucoes_garimpo',
         'otcb_fotos','otcb_jogos','otcb_mensagens','otcb_opinioes','otcb_perfis'],
-  'as 10 tabelas da seção 7.2 existem com RLS habilitado'
+  'as 10 tabelas da seção 7.2 (mais otcb_compartilhamentos, 8.12) existem com RLS habilitado'
 );
 
 select policies_are('public', 'otcb_perfis',
