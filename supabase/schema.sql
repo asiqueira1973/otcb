@@ -909,6 +909,21 @@ $$;
 ALTER FUNCTION "public"."otcb_jogos_gravar"("p_dados" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."otcb_ligar_foto_recente"("p_usuario" "uuid", "p_bar" "uuid") RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  update public.otcb_fotos f set bar_id = p_bar
+   where f.id = (select x.id from public.otcb_fotos x
+                  where x.usuario_id = p_usuario and x.bar_id is null and x.excluido_em is null
+                    and x.e_chopp and x.usuario_confirmou_brahma and x.criado_em > now() - interval '30 minutes'
+                  order by x.criado_em desc limit 1);
+$$;
+
+
+ALTER FUNCTION "public"."otcb_ligar_foto_recente"("p_usuario" "uuid", "p_bar" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."otcb_limpeza_diaria"() RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1067,9 +1082,13 @@ CREATE OR REPLACE FUNCTION "public"."otcb_processar_foto"() RETURNS "trigger"
     SET "search_path" TO ''
     AS $$
 begin
-  if tg_op = 'INSERT' and new.e_chopp and new.bar_id is not null and new.usuario_confirmou_brahma then
+  if (tg_op = 'INSERT' or (tg_op = 'UPDATE' and old.bar_id is null and new.bar_id is not null))
+     and new.e_chopp and new.bar_id is not null and new.usuario_confirmou_brahma then
+    -- Foto ligada depois (bar sugerido em seguida): a evidência vale a partir de agora (clock_timestamp), para ser
+    -- o voto mais recente da pessoa no bar, acima da sugestão gravada na mesma transação.
     insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, usuario_id, foto_id, data_evidencia, peso, meia_vida_dias)
-    values (new.bar_id, 'tem_brahma', 'positivo', 'foto_colarinhometro', 'usuario', new.usuario_id, new.id, new.criado_em, 0, 1);
+    values (new.bar_id, 'tem_brahma', 'positivo', 'foto_colarinhometro', 'usuario', new.usuario_id, new.id,
+            case when tg_op = 'INSERT' then new.criado_em else clock_timestamp() end, 0, 1);
 
     if not exists (select 1 from public.otcb_carimbos c where c.usuario_id = new.usuario_id and c.bar_id = new.bar_id)
        and (select count(*) from public.otcb_carimbos c
@@ -1469,6 +1488,7 @@ begin
   if v_bar is not null then
     perform public.otcb_inserir_confirmacao(v_uid, v_bar, 'tem_brahma',
                                             case when p_tem_brahma then 'positivo' else 'negativo' end::public.otcb_sinal_evidencia);
+    if p_tem_brahma then perform public.otcb_ligar_foto_recente(v_uid, v_bar); end if;
     return jsonb_build_object('bar_id', v_bar, 'criado', false);
   end if;
 
@@ -1489,6 +1509,7 @@ begin
   insert into public.otcb_evidencias (bar_id, assunto, sinal, tipo, origem, usuario_id, data_evidencia, peso, meia_vida_dias)
   values (v_bar, 'tem_brahma', 'positivo', 'sugestao_usuario', 'usuario', v_uid, now(), 0, 1);
 
+  perform public.otcb_ligar_foto_recente(v_uid, v_bar);
   return jsonb_build_object('bar_id', v_bar, 'criado', true);
 end;
 $$;
@@ -1931,7 +1952,7 @@ CREATE OR REPLACE TRIGGER "otcb_trg_evidencia_recalcula" AFTER INSERT OR DELETE 
 
 
 
-CREATE OR REPLACE TRIGGER "otcb_trg_foto_processa" AFTER INSERT OR DELETE OR UPDATE OF "excluido_em" ON "public"."otcb_fotos" FOR EACH ROW EXECUTE FUNCTION "public"."otcb_processar_foto"();
+CREATE OR REPLACE TRIGGER "otcb_trg_foto_processa" AFTER INSERT OR DELETE OR UPDATE OF "excluido_em", "bar_id" ON "public"."otcb_fotos" FOR EACH ROW EXECUTE FUNCTION "public"."otcb_processar_foto"();
 
 
 
@@ -2325,6 +2346,11 @@ GRANT ALL ON FUNCTION "public"."otcb_jogos_disparar"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."otcb_jogos_gravar"("p_dados" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."otcb_jogos_gravar"("p_dados" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."otcb_ligar_foto_recente"("p_usuario" "uuid", "p_bar" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."otcb_ligar_foto_recente"("p_usuario" "uuid", "p_bar" "uuid") TO "service_role";
 
 
 

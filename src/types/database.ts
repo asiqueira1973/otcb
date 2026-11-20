@@ -333,6 +333,9 @@ isOneToOne: false
 "otcb_jogos_gravar":
 { Args: { "p_dados": Json }; Returns: Json
                            },
+"otcb_ligar_foto_recente":
+{ Args: { "p_bar": string,"p_usuario": string }; Returns: undefined
+                           },
 "otcb_limpeza_diaria":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },

@@ -548,6 +548,11 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Agente:** `COBERTURA_JOGOS` e `TEXTOS.coberturaJogos` com o novo alcance; prompt v10.
 - **Checagem real (08/11/2026):** a carga gravou 44 jogos de hoje e amanhã (Copa do Brasil, Série B, Pernambucano, ligas europeias) e "o vasco joga hoje?" respondeu "Joga sim! Vasco x Palmeiras, pela Copa do Brasil, hoje às 17h" com o card de jogos. Os jogos antigos do football-data (sem prefixo `af:`) foram apagados na troca.
 
+### Foto sem bar ligada ao bar sugerido em seguida (19/11/2026)
+- **Caso real:** o Alexandre tirou a foto num bar que não estava no app (saiu sem carimbo, nota 7,9) e cadastrou o bar 2 minutos depois; a foto ficou solta e ele não ganhou o carimbo.
+- **Regra nova (pedido dele: "deixar o jogo mais fácil"):** ao sugerir um bar (novo ou que casa com um existente, "tem Brahma"), `otcb_sugerir_bar` chama `otcb_ligar_foto_recente`: a foto mais recente da pessoa, sem bar, de chopp e com "é Brahma", dos últimos 30 minutos, passa a ser do bar. O trigger `otcb_trg_foto_processa` agora também roda quando a foto ganha bar (`update of bar_id`, de nulo para um bar): cria a evidência de foto (peso 1,0, com data de agora, para ser o voto mais recente da pessoa) e o carimbo, e recalcula a média. Migration `20261119000100`, pgTAP 160 (8 casos). Só no servidor.
+- **Dados:** a foto do Alexandre foi ligada ao Bar do Brenno (Cidade Monções), que ficou confirmado com nota 7,9; ele ganhou o 2º carimbo.
+
 ### Bug da foto em produção e versão 1.0.1 (13/11/2026)
 - **Sintoma:** no app da loja, a foto do Colarinhômetro (pela câmera ou pelo chat) dava "sem rede" e ia para a fila, com rede boa. Nenhuma requisição chegava à `otcb-colarinhometro`.
 - **Causa:** no Expo SDK 58 o `fetch` global é o `expo/fetch`, que não aceita a parte de arquivo `{ uri, name, type }` do FormData do React Native (lança antes de enviar; o app tratava como rede). No Expo Go e nos testes isso não aparecia.
