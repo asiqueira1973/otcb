@@ -548,6 +548,11 @@ Gasto total: cerca de 58 chamadas ao Google, 16 créditos do Firecrawl e 103 cla
 - **Agente:** `COBERTURA_JOGOS` e `TEXTOS.coberturaJogos` com o novo alcance; prompt v10.
 - **Checagem real (08/11/2026):** a carga gravou 44 jogos de hoje e amanhã (Copa do Brasil, Série B, Pernambucano, ligas europeias) e "o vasco joga hoje?" respondeu "Joga sim! Vasco x Palmeiras, pela Copa do Brasil, hoje às 17h" com o card de jogos. Os jogos antigos do football-data (sem prefixo `af:`) foram apagados na troca.
 
+### Nome curto do bar na busca automática (19/11/2026)
+- **Caso:** alguns cadastros no Google usam o nome como título de SEO ("Bar do Juarez Itaim Bibi: Chopp, Picanha, Feijoada, Almoço, Drinks, Delivery SP"), e a descoberta gravava o `displayName` inteiro.
+- **Regra:** `limparNomeBar` (`otcb-garimpo/nome.ts`) corta no primeiro separador (`:`, `|`, `–`, `—`, ` - `) quando o nome passa de 40 caracteres e, se ainda passar de 60, no fim de palavra. Nomes curtos de filial ("Sao Conrado - Vila Madalena") ficam. Teste `nome_test.ts`.
+- **Dados:** "Bar Dois Irmãos" e "Bar do Juarez Itaim Bibi" corrigidos no remoto.
+
 ### Foto sem bar ligada ao bar sugerido em seguida (19/11/2026)
 - **Caso real:** o Alexandre tirou a foto num bar que não estava no app (saiu sem carimbo, nota 7,9) e cadastrou o bar 2 minutos depois; a foto ficou solta e ele não ganhou o carimbo.
 - **Regra nova (pedido dele: "deixar o jogo mais fácil"):** ao sugerir um bar (novo ou que casa com um existente, "tem Brahma"), `otcb_sugerir_bar` chama `otcb_ligar_foto_recente`: a foto mais recente da pessoa, sem bar, de chopp e com "é Brahma", dos últimos 30 minutos, passa a ser do bar. O trigger `otcb_trg_foto_processa` agora também roda quando a foto ganha bar (`update of bar_id`, de nulo para um bar): cria a evidência de foto (peso 1,0, com data de agora, para ser o voto mais recente da pessoa) e o carimbo, e recalcula a média. Migration `20261119000100`, pgTAP 160 (8 casos). Só no servidor.

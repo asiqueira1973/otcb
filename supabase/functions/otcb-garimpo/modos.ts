@@ -1,3 +1,4 @@
+import { limparNomeBar } from "./nome.ts";
 import { dataDaEvidencia, type EvidenciaProposta, evidenciasDaClassificacao, tipoDaPagina } from "./classificacao.ts";
 import type { BarCoordenadas, BarResumo, BarRevisita, Candidato, Contexto, Modo, Posicao } from "./tipos.ts";
 import { ExternalServiceError } from "../_shared/errors.ts";
@@ -136,7 +137,7 @@ async function gravarNoBar(ctx: Contexto, lugar: GooglePlace, bairro: string, ev
   if (evidencias.length === 0) return;
   const criar = evidencias.some(({ e }) => e.assunto === "tem_brahma" && e.sinal === "positivo");
   const bar = await ctx.db.casarOuCriarBar({
-    nome: lugar.nome, endereco: lugar.endereco, bairro: lugar.bairro ?? bairro,
+    nome: limparNomeBar(lugar.nome), endereco: lugar.endereco, bairro: lugar.bairro ?? bairro,
     latitude: lugar.latitude, longitude: lugar.longitude, placeId: lugar.placeId, criar,
   });
   if (!bar.bar_id) return;
