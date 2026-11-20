@@ -1,7 +1,7 @@
--- Épico 8.6 — Colarinhômetro no banco: bar a até 150 m (11.4), tabela da 11.4 (nota, evidência, carimbo),
+-- Épico 8.6 — Colarinhômetro no banco: bar a até 300 m (11.4; era 150 m até a flexibilização de 19/11/2026), tabela da 11.4 (nota, evidência, carimbo),
 -- 2 carimbos novos por dia (11.12), contagem de fotos do dia (11.6) e permissões.
 begin;
-select plan(20);
+select plan(21);
 
 insert into auth.users (id, aud, role, is_anonymous, instance_id) values
   ('00000000-0000-0000-0000-0000000110a1', 'authenticated', 'authenticated', true, '00000000-0000-0000-0000-000000000000');
@@ -13,10 +13,12 @@ insert into public.otcb_bares (id, nome, endereco, bairro, latitude, longitude, 
   ('00000000-0000-0000-0000-000001100003', 'Bar 110 C', 'R', 'T110', -20.020000, -50.000000, 'incerto'),
   ('00000000-0000-0000-0000-000001100004', 'Bar 110 F', 'R', 'T110', -20.030000, -50.000000, 'fechado');
 
--- ===== 11.4: bar mais próximo a até 150 m
+-- ===== 11.4: bar mais próximo a até 300 m (flexibilização de 19/11/2026: GPS dentro de bar erra fácil 150 m)
 select is((select bar_id from public.otcb_bar_mais_proximo(-20.000900, -50.0)), '00000000-0000-0000-0000-000001100001'::uuid,
   'critério 1: a ~100 m acha o bar');
-select is((select count(*)::int from public.otcb_bar_mais_proximo(-20.001800, -50.0)), 0, 'critério 2: a ~200 m não acha bar');
+select is((select bar_id from public.otcb_bar_mais_proximo(-20.002500, -50.0)), '00000000-0000-0000-0000-000001100001'::uuid,
+  'a ~280 m ainda acha o bar (raio de 300 m)');
+select is((select count(*)::int from public.otcb_bar_mais_proximo(-20.003500, -50.0)), 0, 'critério 2: a ~390 m não acha bar');
 select is((select count(*)::int from public.otcb_bar_mais_proximo(-20.030000, -50.0)), 0, 'bar fechado não conta');
 
 -- Helper do teste: insere a foto como a Edge Function faria.
