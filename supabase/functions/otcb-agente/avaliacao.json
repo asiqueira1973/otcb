@@ -61,7 +61,8 @@
       "espera": {
         "status": 200,
         "algum_bloco": [
-          "card_bar"
+          "card_bar",
+          "lista_bares"
         ],
         "bares_incluem": [
           "Bar do juarez"
